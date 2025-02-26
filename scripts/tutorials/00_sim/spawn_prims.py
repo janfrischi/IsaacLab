@@ -8,7 +8,7 @@
 .. code-block:: bash
 
     # Usage
-    ./isaaclab.sh -p scripts/tutorials/00_sim/spawn_prims.py
+    ./isaaclab.sh -p scripts/tutorials/00_sim/create_empty.py
 
 """
 
@@ -79,11 +79,11 @@ def design_scene():
         size=(0.2, 0.5, 0.2),
         deformable_props=sim_utils.DeformableBodyPropertiesCfg(),
         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
-        physics_material=sim_utils.DeformableBodyMaterialCfg(),
+        physics_material=sim_utils.DeformableBodyMaterialCfg(elasticity_damping=0.8),
     )
-    cfg_cuboid_deformable.func("/World/Objects/CuboidDeformable", cfg_cuboid_deformable, translation=(0.15, 0.0, 2.0))
+    cfg_cuboid_deformable.func("/World/Objects/CuboidDeformable", cfg_cuboid_deformable, translation=(0.15, 0.0, 5.0))
 
-    # spawn a usd file of a table into the scene
+    # spawn a usd file of a table into the scene -> Spawn USD file of table from Isaac Nucleus
     cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd")
     cfg.func("/World/Objects/Table", cfg, translation=(0.0, 0.0, 1.05))
 

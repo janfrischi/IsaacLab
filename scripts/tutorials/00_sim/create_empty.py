@@ -33,7 +33,7 @@ simulation_app = app_launcher.app
 
 from isaaclab.sim import SimulationCfg, SimulationContext
 
-
+# Define the main function
 def main():
     """Main function."""
 
@@ -43,7 +43,7 @@ def main():
     # Set main camera
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
 
-    # Play the simulator
+    # Play the simulator -> Initializes physics and is different from .play()
     sim.reset()
     # Now we are ready!
     print("[INFO]: Setup complete...")
