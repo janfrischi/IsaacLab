@@ -41,16 +41,19 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 
+# Designing the scene
 from isaaclab_tasks.manager_based.classic.cartpole.cartpole_env_cfg import CartpoleSceneCfg
 
-
+# Defining Actions
+# config classes enable automatic instantiation of objects
 @configclass
 class ActionsCfg:
     """Action specifications for the environment."""
-
+    # Define the force to be applied to the cart
     joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["slider_to_cart"], scale=5.0)
 
 
+# Defining Observations -> The individual terms are defined by inheriting from the ObsTerm class
 @configclass
 class ObservationsCfg:
     """Observation specifications for the environment."""
@@ -75,18 +78,18 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    # on startup
+    # on startup -> Randomize the mass of the pole at the start, only done once since this operation is expensive
     add_pole_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=["pole"]),
-            "mass_distribution_params": (0.1, 0.5),
+            "mass_distribution_params": (0.1, 0.5), # the mass is randomly sampled from 0.1 to 0.5 kg
             "operation": "add",
         },
     )
 
-    # on reset
+    # on reset -> Randomize the joint position at every reset
     reset_cart_position = EventTerm(
         func=mdp.reset_joints_by_offset,
         mode="reset",
@@ -107,18 +110,19 @@ class EventCfg:
         },
     )
 
-
+# Tying it all together
 @configclass
 class CartpoleEnvCfg(ManagerBasedEnvCfg):
     """Configuration for the cartpole environment."""
 
     # Scene settings
     scene = CartpoleSceneCfg(num_envs=1024, env_spacing=2.5)
-    # Basic settings
+    # Basic settings -> Previously defined action, observation and event configurations
     observations = ObservationsCfg()
     actions = ActionsCfg()
     events = EventCfg()
 
+    # Simulation parameters such as gravity, timestep, etc.
     def __post_init__(self):
         """Post initialization."""
         # viewer settings
@@ -129,7 +133,7 @@ class CartpoleEnvCfg(ManagerBasedEnvCfg):
         # simulation settings
         self.sim.dt = 0.005  # sim step every 5ms: 200Hz
 
-
+# Running the simulation
 def main():
     """Main function."""
     # parse the arguments
@@ -151,7 +155,7 @@ def main():
             # sample random actions
             joint_efforts = torch.randn_like(env.action_manager.action)
             # step the environment
-            obs, _ = env.step(joint_efforts)
+            obs, _ = env.step(joint_efforts) # Use joint efforts as action input
             # print current orientation of pole
             print("[Env 0]: Pole joint: ", obs["policy"][0][1].item())
             # update counter

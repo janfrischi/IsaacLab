@@ -25,6 +25,7 @@ def object_position_in_robot_root_frame(
     robot: RigidObject = env.scene[robot_cfg.name]
     object: RigidObject = env.scene[object_cfg.name]
     object_pos_w = object.data.root_pos_w[:, :3]
+    # Transform the object position to the robot's root frame
     object_pos_b, _ = subtract_frame_transforms(
         robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_pos_w
     )

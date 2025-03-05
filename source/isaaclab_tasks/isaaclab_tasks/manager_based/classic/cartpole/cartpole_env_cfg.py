@@ -114,7 +114,7 @@ class RewardsCfg:
 
     # (1) Constant running reward
     alive = RewTerm(func=mdp.is_alive, weight=1.0)
-    # (2) Failure penalty
+    # (2) Failure penalty -> Penalize termination
     terminating = RewTerm(func=mdp.is_terminated, weight=-2.0)
     # (3) Primary task: keep pole upright
     pole_pos = RewTerm(

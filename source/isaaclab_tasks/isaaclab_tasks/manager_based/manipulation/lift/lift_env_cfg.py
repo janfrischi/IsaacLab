@@ -21,10 +21,11 @@ from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdF
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
+# Import the MDP "Markov Decision Process" settings
 from . import mdp
 
 ##
-# Scene definition
+# Scene definition --> Define the physical scene
 ##
 
 
@@ -39,7 +40,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = MISSING
     # end-effector sensor: will be populated by agent env cfg
     ee_frame: FrameTransformerCfg = MISSING
-    # target object: will be populated by agent env cfg
+    # target object: will be populated by agent env cfg -> target object
     object: RigidObjectCfg | DeformableObjectCfg = MISSING
 
     # Table
@@ -67,7 +68,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 # MDP settings
 ##
 
-
+# Command Manager
 @configclass
 class CommandsCfg:
     """Command terms for the MDP."""
@@ -82,16 +83,16 @@ class CommandsCfg:
         ),
     )
 
-
+# Action Manager --> Define the actions that the agent can take
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
 
     # will be set by agent env cfg
-    arm_action: mdp.JointPositionActionCfg | mdp.DifferentialInverseKinematicsActionCfg = MISSING
+    arm_action: mdp.JointPositionActionCfg | mdp.DifferentialInverseKinematicsActionCfg = mdp.JointPositionActionCfg(scale=0.1)
     gripper_action: mdp.BinaryJointPositionActionCfg = MISSING
 
-
+# Observation Manager --> Define the observations that the agent can make
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -99,10 +100,12 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-
+        # Joint position and velocity
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        # Object position in the robot base frame
         object_position = ObsTerm(func=mdp.object_position_in_robot_root_frame)
+        # Target object position
         target_object_position = ObsTerm(func=mdp.generated_commands, params={"command_name": "object_pose"})
         actions = ObsTerm(func=mdp.last_action)
 
@@ -113,7 +116,7 @@ class ObservationsCfg:
     # observation groups
     policy: PolicyCfg = PolicyCfg()
 
-
+# Event Manager --> Define the events that can occur in the environment 
 @configclass
 class EventCfg:
     """Configuration for events."""
@@ -130,7 +133,7 @@ class EventCfg:
         },
     )
 
-
+# Reward Manager --> Define the rewards that the agent can receive
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
@@ -152,13 +155,16 @@ class RewardsCfg:
     )
 
     # action penalty
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-3)
 
     joint_vel = RewTerm(
         func=mdp.joint_vel_l2,
-        weight=-1e-4,
+        weight=-1e-3,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
+
+    # New reward term Gripper alignment with cube
+    #gripper_alignment_with_cube = RewTerm(func=mdp.gripper_alignment_with_cube, params={"std": 0.1}, weight=1)
 
 
 @configclass
@@ -189,7 +195,7 @@ class CurriculumCfg:
 # Environment configuration
 ##
 
-
+# Define the full environment using the scene and the MDP settings
 @configclass
 class LiftEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the lifting environment."""

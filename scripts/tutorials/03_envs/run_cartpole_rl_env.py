@@ -38,7 +38,7 @@ def main():
     # create environment configuration
     env_cfg = CartpoleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
-    # setup RL environment
+    # setup RL environment -> We're now using the ManagerBasedRLEnv
     env = ManagerBasedRLEnv(cfg=env_cfg)
 
     # simulate physics

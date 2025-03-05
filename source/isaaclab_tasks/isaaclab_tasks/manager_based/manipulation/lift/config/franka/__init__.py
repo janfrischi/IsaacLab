@@ -15,6 +15,7 @@ from . import agents
 # Joint Position Control
 ##
 
+# Register the gym environment for the Franka Panda robot lifting a cube.
 gym.register(
     id="Isaac-Lift-Cube-Franka-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
