@@ -19,15 +19,15 @@ from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 ##
-# Configuration
+# Configuration of the Franka Emika Panda robot
 ##
 
 FRANKA_PANDA_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ISAACLAB_NUCLEUS_DIR}/Robots/FrankaEmika/panda_instanceable.usd",
-        activate_contact_sensors=False,
+        activate_contact_sensors=False, # Disable contact sensors
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
+            disable_gravity=False, # Enable gravity
             max_depenetration_velocity=5.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
@@ -35,6 +35,7 @@ FRANKA_PANDA_CFG = ArticulationCfg(
         ),
         # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.005, rest_offset=0.0),
     ),
+    # Initial joint positions -> Robot is in a neutral position
     init_state=ArticulationCfg.InitialStateCfg(
         joint_pos={
             "panda_joint1": 0.0,
@@ -47,13 +48,14 @@ FRANKA_PANDA_CFG = ArticulationCfg(
             "panda_finger_joint.*": 0.04,
         },
     ),
+    # Actuators configuration -> Define the joint velocity limits, effort limits, stiffness, and damping
     actuators={
         "panda_shoulder": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[1-4]"],
-            effort_limit=87.0,
-            velocity_limit=2.175,
-            stiffness=80.0,
-            damping=4.0,
+            effort_limit=87.0, # Maximum torque that can be applied to the joint
+            velocity_limit=2.175, # Maximum velocity of the joint
+            stiffness=80.0, # Stiffness of the joint
+            damping=4.0, # Damping of the joint
         ),
         "panda_forearm": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[5-7]"],
@@ -74,7 +76,8 @@ FRANKA_PANDA_CFG = ArticulationCfg(
 )
 """Configuration of Franka Emika Panda robot."""
 
-
+# Configuration of the Franka Emika Panda robot with stiffer PD control
+# Create a copy of the FRANKA_PANDA_CFG and modify the actuator stiffness and damping
 FRANKA_PANDA_HIGH_PD_CFG = FRANKA_PANDA_CFG.copy()
 FRANKA_PANDA_HIGH_PD_CFG.spawn.rigid_props.disable_gravity = True
 FRANKA_PANDA_HIGH_PD_CFG.actuators["panda_shoulder"].stiffness = 400.0

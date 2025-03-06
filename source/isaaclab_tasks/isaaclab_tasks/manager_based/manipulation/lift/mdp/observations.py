@@ -15,18 +15,20 @@ from isaaclab.utils.math import subtract_frame_transforms
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
-
+# Retrieve the objects position in the robots baseframe, this is crucial for the manipulation task
 def object_position_in_robot_root_frame(
     env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
 ) -> torch.Tensor:
+    
     """The position of the object in the robot's root frame."""
     robot: RigidObject = env.scene[robot_cfg.name]
     object: RigidObject = env.scene[object_cfg.name]
+    # Get the object position in the world frame, the result is a batch tensor
     object_pos_w = object.data.root_pos_w[:, :3]
-    # Transform the object position to the robot's root frame
-    object_pos_b, _ = subtract_frame_transforms(
-        robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_pos_w
-    )
+    # Transform the object position to the robot's base frame
+    object_pos_b, _ = subtract_frame_transforms(robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_pos_w)
+    #print(f"Object position in robot base frame: {object_pos_b}")
+    
     return object_pos_b

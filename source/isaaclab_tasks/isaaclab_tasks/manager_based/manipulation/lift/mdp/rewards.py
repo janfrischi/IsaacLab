@@ -14,19 +14,21 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
 from isaaclab.utils.math import combine_frame_transforms, matrix_from_quat
 
+
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
-
+# Reward agent for lifting the object above the minimal height. -> Binary reward function
 def object_is_lifted(
     env: ManagerBasedRLEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
 ) -> torch.Tensor:
     """Reward the agent for lifting the object above the minimal height."""
     object: RigidObject = env.scene[object_cfg.name]
+    # Return a binary tensor [:,2] extracts the z coordinate of the object
     return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
 
 # Reward agent for moving the end-effector closer to the object. Use tanh-kernel to reward the agent for reaching the object.
-# The closer the ee the higher the reward.
+# The closer the ee the higher the reward.-> Encourage the agent to move the end-effector closer to the object.
 def object_ee_distance(
     env: ManagerBasedRLEnv,
     std: float,
@@ -41,7 +43,7 @@ def object_ee_distance(
     cube_pos_w = object.data.root_pos_w
     # End-effector position: (num_envs, 3)
     ee_w = ee_frame.data.target_pos_w[..., 0, :]
-    # Distance of the end-effector to the object: (num_envs,)
+    # Distance of the end-effector to the object: (num_envs,) L2 norm
     object_ee_distance = torch.norm(cube_pos_w - ee_w, dim=1)
 
     return 1 - torch.tanh(object_ee_distance / std)
@@ -55,81 +57,77 @@ def object_goal_distance(
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
 ) -> torch.Tensor:
-    """Reward the agent for tracking the goal pose using tanh-kernel."""
     
     # Extract robot & object states
     robot: RigidObject = env.scene[robot_cfg.name]
     object: RigidObject = env.scene[object_cfg.name]
     command = env.command_manager.get_command(command_name)
 
-    # Compute desired world position & quaternion
+    # Compute desired position in the base frame xyz and the quaterion
     des_pos_b, des_quat_b = command[:, :3], command[:, 3:7]
+    # Convert the goal position and orientation from local frame to base frame
     des_pos_w, des_quat_w = combine_frame_transforms(
         robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], 
         des_pos_b, des_quat_b
     )
 
-    # Compute position distance
+    # Compute position distance -> Encourage agent to reduce this distance over time
     distance = torch.norm(des_pos_w - object.data.root_pos_w[:, :3], dim=1)
 
     # Compute orientation difference (corrected quaternion distance)
     object_quat_w = object.data.root_quat_w
     quat_diff = torch.abs(torch.sum(des_quat_w * object_quat_w, dim=1))
-    quat_diff = 2 * torch.acos(torch.clamp(quat_diff, -1, 1))  # Convert to angular error
+    # 2*acos(...) converts it into a full angle distance in radiands
+    quat_diff = 2 * torch.acos(torch.clamp(quat_diff, -1, 1))
 
     # Compute tanh-based penalties
     position_penalty = 1 - torch.tanh(distance / std)
-    orientation_penalty = 1 - torch.tanh(0.5 * quat_diff / 3.14)  # Normalize by π
+    # Normalize the orientation penalty to be in [0, 1]
+    orientation_penalty = 1 - torch.tanh(0.5 * quat_diff / 3.14)
 
-    # Final reward calculation (only when object is lifted)
+    # Final reward calculation (only when object is lifted above minimal height)
     return (object.data.root_pos_w[:, 2] > minimal_height) * (position_penalty + orientation_penalty)
 
-
-""" def gripper_alignment_with_cube(
+""" def object_goal_distance(
     env: ManagerBasedRLEnv,
     std: float,
+    minimal_height: float,
+    command_name: str,
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
-    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
 ) -> torch.Tensor:
     
-    # Extract scene entities
+    # Extract robot and EE states
+    robot: RigidObject = env.scene[robot_cfg.name]
     ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
-    object: RigidObject = env.scene[object_cfg.name]
+    command = env.command_manager.get_command(command_name)
 
-    # Get gripper and object orientations (quaternions)
-    gripper_quat = ee_frame.data.target_quat_w[..., 0, :]  # (num_envs, 4)
-    cube_quat = object.data.root_quat_w  # (num_envs, 4)
+    # Compute desired position in the base frame xyz and the quaternion
+    des_pos_b, des_quat_b = command[:, :3], command[:, 3:7]
+    # Convert the goal position and orientation from local frame to world frame
+    des_pos_w, des_quat_w = combine_frame_transforms(
+        robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], 
+        des_pos_b, des_quat_b
+    )
 
-    # Convert quaternions to rotation matrices
-    gripper_rot_mat = matrix_from_quat(gripper_quat)  # (num_envs, 3, 3)
-    cube_rot_mat = matrix_from_quat(cube_quat)  # (num_envs, 3, 3)
+    # Extract EE position and orientation in world frame
+    ee_pos_w = ee_frame.data.target_pos_w[..., 0, :]  # (num_envs, 3)
+    ee_quat_w = ee_frame.data.target_quat_w[..., 0, :]  # (num_envs, 4)
 
-    # Extract the Z-axis (approach direction) of the gripper
-    gripper_z_axis = gripper_rot_mat[:, :, 2]  # (num_envs, 3)
+    # Compute position distance -> Encourage agent to move EE closer to goal
+    distance = torch.norm(des_pos_w - ee_pos_w, dim=1)
 
-    # Extract the Z-axis (surface normal) of the cube
-    cube_z_axis = cube_rot_mat[:, :, 2]  # (num_envs, 3)
+    # Compute orientation difference (quaternion distance)
+    quat_diff = torch.abs(torch.sum(des_quat_w * ee_quat_w, dim=1))
+    quat_diff = 2 * torch.acos(torch.clamp(quat_diff, -1, 1))  # Convert to angle in radians
 
-    # Normalize vectors
-    gripper_z_axis = gripper_z_axis / torch.norm(gripper_z_axis, dim=1, keepdim=True)
-    cube_z_axis = cube_z_axis / torch.norm(cube_z_axis, dim=1, keepdim=True)
+    # Compute tanh-based penalties
+    position_penalty = 1 - torch.tanh(distance / std)
+    orientation_penalty = 1 - torch.tanh(0.5 * quat_diff / 3.14)  # Normalize to [0, 1]
 
-    # Compute alignment (dot product should be close to 1 when aligned)
-    alignment_score = torch.sum(gripper_z_axis * (-cube_z_axis), dim=1)  # (num_envs,)
-
-    # Normalize alignment score to be in [0, 1] (Shift range from [-1,1] to [0,1])
-    alignment_score = (alignment_score + 1) / 2  
-
-    # Compute reward using tanh kernel
-    reward = 1 - torch.tanh((1 - alignment_score) / std)
-
-    # Ensure reward is never exactly zero (for GUI logging)
-    reward = torch.where(reward == 0.0, torch.tensor(1e-5, device=reward.device), reward)
-
-    # Debugging print
-    #print("Gripper Alignment Reward:", reward.mean().item())
-
-    return reward """
+    # Final reward calculation (only when EE is above minimal height)
+    return (ee_pos_w[:, 2] > minimal_height) * (position_penalty + orientation_penalty)
+ """
 
 
 
