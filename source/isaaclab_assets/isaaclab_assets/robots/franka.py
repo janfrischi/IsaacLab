@@ -53,14 +53,16 @@ FRANKA_PANDA_CFG = ArticulationCfg(
         "panda_shoulder": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[1-4]"],
             effort_limit=87.0, # Maximum torque that can be applied to the joint
-            velocity_limit=2.175, # Maximum velocity of the joint
+            velocity_limit=1, # Conservative velocity limit of the joint
+            #velocity_limit=2.175, # Maximum velocity of the joint
             stiffness=80.0, # Stiffness of the joint
             damping=4.0, # Damping of the joint
         ),
         "panda_forearm": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[5-7]"],
             effort_limit=12.0,
-            velocity_limit=2.61,
+            velocity_limit=1, # Conservative velocity limit of the joint
+            #velocity_limit=2.61,
             stiffness=80.0,
             damping=4.0,
         ),

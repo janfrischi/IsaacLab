@@ -3,7 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Common functions that can be used to create observation terms.
+"""Common functions that can be used to create observation terms. 
+Observation functions extract state infromation from the robot and environment to be used as input for an RL policy.
 
 The functions can be passed to the :class:`isaaclab.managers.ObservationTermCfg` object to enable
 the observation introduced by the function.

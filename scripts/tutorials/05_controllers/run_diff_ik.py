@@ -12,7 +12,7 @@ PhysX. This helps perform parallelized computation of the inverse kinematics.
 .. code-block:: bash
 
     # Usage
-    ./isaaclab.sh -p scripts/tutorials/05_controllers/ik_control.py
+    ./isaaclab.sh -p scripts/tutorials/05_controllers/run_diff_ik.py
 
 """
 
@@ -105,13 +105,21 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     ee_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_current"))
     goal_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_goal"))
 
-    # Define goals for the arm
+    # Define corrected EE goals within Franka Emika Panda's workspace
     ee_goals = [
-        [0.5, 0.5, 0.7, 0.707, 0, 0.707, 0],
-        [0.5, -0.4, 0.6, 0.707, 0.707, 0.0, 0.0],
-        [0.5, 0, 0.5, 0.0, 1.0, 0.0, 0.0],
-        [0.5, 0.5, 0.7, 0.707, 0, 0.707, 0]
+        [0.6,  0.3,  0.6,  0.923,  0.0,  0.382,  0.0],  # High forward reach with slight pitch
+        [0.5, -0.3,  0.4,  0.707,  0.707,  0.0,   0.0],  # Diagonal reach with wrist flip
+        [0.75,  0.0,  0.5,  0.5,    0.5,    0.5,   0.5],  # Full stretch forward with rotation
+        [0.4,  0.2,  0.3,  0.0,    1.0,    0.0,   0.0],  # Close reach downwards with full pitch
+        [0.6, -0.4,  0.7,  0.707,  0.0,    0.707, 0.0],  # Side reach, twisting motion
+        [0.5,  0.2,  0.6,  0.0,    0.707,  0.707, 0.0],  # Inward sweep with 90° yaw rotation
+        [0.55, -0.35,  0.5,  0.707, -0.707,  0.0,   0.0],  # Low side reach with inverted wrist
+        [0.65,  0.4,  0.4,  0.382,  0.0,    0.923, 0.0],  # Diagonal stretch with rotation
+        [0.3, -0.5,  0.5,  0.923,  0.0,   -0.382, 0.0],  # Far sideways stretch with tilt
+        [0.5,  0.3,  0.6,  0.707,  0.0,    0.707, 0.0]   # Return to start
     ]
+
+
     ee_goals = torch.tensor(ee_goals, device=sim.device)
     # Track the given command
     current_goal_idx = 0
@@ -142,7 +150,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Simulation loop
     while simulation_app.is_running():
         # reset
-        if count % 150 == 0:
+        if count % 300 == 0:
             # reset time
             count = 0
             # reset joint state

@@ -20,7 +20,7 @@ from isaaclab_tasks.manager_based.manipulation.lift.lift_env_cfg import LiftEnvC
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
 
-# Link LiftEnvCfg to FrankaCubeLiftEnvCfg class, FrankaCubeLiftEnvCfg inherits from LiftEnvCfg
+# Link LiftEnvCfg to FrankaCubeLiftEnvCfg class, FrankaCubeLiftEnvCfg inherits from LiftEnvCfg we defined in lift_env_cfg.py
 @configclass
 class FrankaCubeLiftEnvCfg(LiftEnvCfg):
     def __post_init__(self):

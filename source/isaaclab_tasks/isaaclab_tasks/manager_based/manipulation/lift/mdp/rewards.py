@@ -85,49 +85,9 @@ def object_goal_distance(
     # Normalize the orientation penalty to be in [0, 1]
     orientation_penalty = 1 - torch.tanh(0.5 * quat_diff / 3.14)
 
-    # Final reward calculation (only when object is lifted above minimal height)
-    return (object.data.root_pos_w[:, 2] > minimal_height) * (position_penalty + orientation_penalty)
+    # Final reward calculation (only when object is lifted above minimal height) , too heigh weight for orientation lead to oscillations
+    return (object.data.root_pos_w[:, 2] > minimal_height) * (position_penalty + 1.5*orientation_penalty)
 
-""" def object_goal_distance(
-    env: ManagerBasedRLEnv,
-    std: float,
-    minimal_height: float,
-    command_name: str,
-    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
-) -> torch.Tensor:
-    
-    # Extract robot and EE states
-    robot: RigidObject = env.scene[robot_cfg.name]
-    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
-    command = env.command_manager.get_command(command_name)
-
-    # Compute desired position in the base frame xyz and the quaternion
-    des_pos_b, des_quat_b = command[:, :3], command[:, 3:7]
-    # Convert the goal position and orientation from local frame to world frame
-    des_pos_w, des_quat_w = combine_frame_transforms(
-        robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], 
-        des_pos_b, des_quat_b
-    )
-
-    # Extract EE position and orientation in world frame
-    ee_pos_w = ee_frame.data.target_pos_w[..., 0, :]  # (num_envs, 3)
-    ee_quat_w = ee_frame.data.target_quat_w[..., 0, :]  # (num_envs, 4)
-
-    # Compute position distance -> Encourage agent to move EE closer to goal
-    distance = torch.norm(des_pos_w - ee_pos_w, dim=1)
-
-    # Compute orientation difference (quaternion distance)
-    quat_diff = torch.abs(torch.sum(des_quat_w * ee_quat_w, dim=1))
-    quat_diff = 2 * torch.acos(torch.clamp(quat_diff, -1, 1))  # Convert to angle in radians
-
-    # Compute tanh-based penalties
-    position_penalty = 1 - torch.tanh(distance / std)
-    orientation_penalty = 1 - torch.tanh(0.5 * quat_diff / 3.14)  # Normalize to [0, 1]
-
-    # Final reward calculation (only when EE is above minimal height)
-    return (ee_pos_w[:, 2] > minimal_height) * (position_penalty + orientation_penalty)
- """
 
 
 

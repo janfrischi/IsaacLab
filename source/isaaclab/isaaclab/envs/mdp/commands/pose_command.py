@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from .commands_cfg import UniformPoseCommandCfg
 
-
+# This class inherits from the CommandTerm class defined in the command_manager.py file
 class UniformPoseCommand(CommandTerm):
     """Command generator for generating pose commands uniformly.
 
@@ -63,7 +63,7 @@ class UniformPoseCommand(CommandTerm):
         self.pose_command_b = torch.zeros(self.num_envs, 7, device=self.device)
         self.pose_command_b[:, 3] = 1.0
         self.pose_command_w = torch.zeros_like(self.pose_command_b)
-        # -- metrics
+        # -- metrics, position error tracks distance between current and desired position, orientation error tracks distance between current and desired orientation
         self.metrics["position_error"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["orientation_error"] = torch.zeros(self.num_envs, device=self.device)
 
@@ -76,7 +76,7 @@ class UniformPoseCommand(CommandTerm):
     """
     Properties
     """
-
+    # Allows external access to the current pose command
     @property
     def command(self) -> torch.Tensor:
         """The desired pose command. Shape is (num_envs, 7).

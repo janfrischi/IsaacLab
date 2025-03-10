@@ -38,7 +38,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     which need to set the target object, robot and end-effector frames
     """
 
-    # robots: will be populated by agent env cfg
+    # robots: will be populated by agent env cfg in joint_pos_env_cfg.py
     robot: ArticulationCfg = MISSING
     # end-effector sensor: will be populated by agent env cfg
     ee_frame: FrameTransformerCfg = MISSING
@@ -153,7 +153,7 @@ class RewardsCfg:
     object_goal_tracking = RewTerm(
         func=mdp.object_goal_distance,
         params={"std": 0.3, "minimal_height": 0.04, "command_name": "object_pose"},
-        weight=17.0,
+        weight=17.0, # I have changed this weight
     )
 
     object_goal_tracking_fine_grained = RewTerm(
@@ -168,6 +168,14 @@ class RewardsCfg:
     joint_vel = RewTerm(
         func=mdp.joint_vel_l2,
         weight=-1e-3,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    # TODO: Try to add a reward term for the end effector orientation
+    # End effector should be flat
+    ee_orientation = RewTerm(
+        func=mdp.flat_orientation_l2,
+        weight=3,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
