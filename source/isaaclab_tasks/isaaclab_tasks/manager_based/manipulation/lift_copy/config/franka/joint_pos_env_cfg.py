@@ -13,7 +13,6 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 from isaaclab_tasks.manager_based.manipulation.lift import mdp
 from isaaclab_tasks.manager_based.manipulation.lift.lift_env_cfg import LiftEnvCfg
-from isaaclab.envs.mdp.actions.actions_cfg import EMAJointPositionToLimitsActionCfg
 
 ##
 # Pre-defined configs
@@ -22,34 +21,26 @@ from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
 
 # Link LiftEnvCfg to FrankaCubeLiftEnvCfg class, FrankaCubeLiftEnvCfg inherits from LiftEnvCfg we defined in lift_env_cfg.py
-# This class is used to define the environment configuration for the Franka robot to lift a cube
-# The LiftEnvCfg only defines the scene, object, and actions, the rest of the configurations are defined in the derived classes
 @configclass
 class FrankaCubeLiftEnvCfg(LiftEnvCfg):
     def __post_init__(self):
-        # Ensure that the parents initialization logic is executed before customizing Franka + Cube lift environment
+        # post init of parent
         super().__post_init__()
 
         # Set Franka as robot, can be found under assets/robots/franka.py
         self.scene.robot = FRANKA_PANDA_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-        # The action values don't directly set joint positions but are processed by controllers.
-
-        # Set actions for the specific robot type (franka) -> Robot arm will be controller via joint position control
+        # Set actions for the specific robot type (franka)
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot", joint_names=["panda_joint.*"], scale=0.5, use_default_offset=True
         )
-        
-        # Gripper actions, specifying open and close commands
         self.actions.gripper_action = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
             joint_names=["panda_finger.*"],
-            # Open command: Fingers set to 0.04m apart
             open_command_expr={"panda_finger_.*": 0.04},
-            # Close command: Fingers set to 0.0m apart
             close_command_expr={"panda_finger_.*": 0.0},
         )
-        # Specify panda_hand as the end effector frame
+        # Set the body name for the end effector
         self.commands.object_pose.body_name = "panda_hand"
 
         # Set Cube as object
@@ -100,5 +91,3 @@ class FrankaCubeLiftEnvCfg_PLAY(FrankaCubeLiftEnvCfg):
         self.scene.env_spacing = 2.5
         # disable randomization for play
         self.observations.policy.enable_corruption = False
-
-

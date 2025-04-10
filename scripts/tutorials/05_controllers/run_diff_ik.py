@@ -55,7 +55,7 @@ from isaaclab.utils.math import subtract_frame_transforms
 ##
 from isaaclab_assets import FRANKA_PANDA_HIGH_PD_CFG, UR10_CFG  # isort:skip
 
-
+# Define the scene configuration
 @configclass
 class TableTopSceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
@@ -72,7 +72,7 @@ class TableTopSceneCfg(InteractiveSceneCfg):
         prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     )
 
-    # mount
+    # mount -> where the robot is placed
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
         spawn=sim_utils.UsdFileCfg(
@@ -89,6 +89,7 @@ class TableTopSceneCfg(InteractiveSceneCfg):
         raise ValueError(f"Robot {args_cli.robot} is not supported. Valid: franka_panda, ur10")
 
 
+#
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     """Runs the simulation loop."""
     # Extract scene entities
@@ -96,7 +97,9 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     robot = scene["robot"]
 
     # Create controller
+    # Differential IK controller configuration
     diff_ik_cfg = DifferentialIKControllerCfg(command_type="pose", use_relative_mode=False, ik_method="dls")
+    # Create the controller
     diff_ik_controller = DifferentialIKController(diff_ik_cfg, num_envs=scene.num_envs, device=sim.device)
 
     # Markers
@@ -105,7 +108,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     ee_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_current"))
     goal_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_goal"))
 
-    # Define corrected EE goals within Franka Emika Panda's workspace
+    # Define the end effector goals
     ee_goals = [
         [0.6,  0.3,  0.6,  0.923,  0.0,  0.382,  0.0],  # High forward reach with slight pitch
         [0.5, -0.3,  0.4,  0.707,  0.707,  0.0,   0.0],  # Diagonal reach with wrist flip
@@ -119,7 +122,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         [0.5,  0.3,  0.6,  0.707,  0.0,    0.707, 0.0]   # Return to start
     ]
 
-
+    # Convert the goals to tensors
     ee_goals = torch.tensor(ee_goals, device=sim.device)
     # Track the given command
     current_goal_idx = 0
@@ -158,15 +161,16 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             joint_vel = robot.data.default_joint_vel.clone()
             robot.write_joint_state_to_sim(joint_pos, joint_vel)
             robot.reset()
-            # reset actions
+            # Set the new goal command
             ik_commands[:] = ee_goals[current_goal_idx]
             joint_pos_des = joint_pos[:, robot_entity_cfg.joint_ids].clone()
-            # reset controller
+            # Reset controller and provide new goal
             diff_ik_controller.reset()
             diff_ik_controller.set_command(ik_commands)
             # change goal
             current_goal_idx = (current_goal_idx + 1) % len(ee_goals)
         else:
+            # If no reset - Run differential IK to compute the joint commands
             # obtain quantities from simulation
             jacobian = robot.root_physx_view.get_jacobians()[:, ee_jacobi_idx, :, robot_entity_cfg.joint_ids]
             ee_pose_w = robot.data.body_state_w[:, robot_entity_cfg.body_ids[0], 0:7]
@@ -203,7 +207,7 @@ def main():
     sim = sim_utils.SimulationContext(sim_cfg)
     # Set main camera
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
-    # Design scene
+    # Design scene -> Table top scene defined above
     scene_cfg = TableTopSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator

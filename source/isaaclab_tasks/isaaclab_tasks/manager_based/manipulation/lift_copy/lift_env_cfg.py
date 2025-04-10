@@ -26,7 +26,10 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 # Import the MDP "Markov Decision Process" settings
 from . import mdp
 
-# --------------------------------Scene definition --> Define the physical scene in which the agent will interact-------------------------------
+##
+# Scene definition --> Define the physical scene
+##
+
 
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
@@ -39,7 +42,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = MISSING
     # end-effector sensor: will be populated by agent env cfg
     ee_frame: FrameTransformerCfg = MISSING
-    # target object: object is defined in joint_pos_env_cfg.py
+    # target object: will be populated by agent env cfg -> target object
     object: RigidObjectCfg | DeformableObjectCfg = MISSING
 
     # Table -> The table variable is an instance of the AssetBaseCfg class
@@ -64,7 +67,10 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
-# -----------------------------MDP settings----------------------------------------------------
+
+##
+# MDP settings
+##
 
 # Command Manager
 @configclass
@@ -124,12 +130,12 @@ class EventCfg:
     """Configuration for events."""
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
-    # Randomize the object
+    # Randomize the objecccccct
     reset_object_position = EventTerm(
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (-0.2, 0.2), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
+            "pose_range": {"x": (-0.1, 0.1), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
         },
@@ -138,7 +144,6 @@ class EventCfg:
 # Reward Manager --> Define the rewards that the agent can receive
 @configclass
 class RewardsCfg:
-
     """Reward terms for the MDP."""
 
     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
@@ -158,27 +163,13 @@ class RewardsCfg:
     )
 
     # action penalty
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.075)
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-3)
 
     joint_vel = RewTerm(
         func=mdp.joint_vel_l2,
-        weight=-1e-4,
+        weight=-1e-3,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
-
-    # # Introduce a reward that penalizes high torques
-    # joint_torque_penalty = RewTerm(
-    #     func=mdp.joint_torques_l2,
-    #     weight=-1e-2,
-    #     params={"asset_cfg": SceneEntityCfg("robot")},
-    # )
-
-    # # Penalize high accelerations
-    # joint_acceleration_penalty = RewTerm(
-    #     func=mdp.joint_acc_l2,
-    #     weight=-1e-2,
-    #     params={"asset_cfg": SceneEntityCfg("robot")},
-    # )
 
     # TODO: Try to add a reward term for the end effector orientation
     # End effector should be flat

@@ -18,12 +18,9 @@ from . import agents
 # Register the gym environment for the Franka Panda robot lifting a cube.
 gym.register(
     id="Isaac-Lift-Cube-Franka-v0",
-    # Entry point to the environment class. -> ManagerBasedRLEnv
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
-    # This dictionary contains the configuration for the environment.
     kwargs={
         "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:FrankaCubeLiftEnvCfg",
-        # Reinforcement learning algorithms for the environment.
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_cfg.yaml",
         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
