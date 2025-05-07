@@ -51,3 +51,9 @@ def object_reached_goal(
 
     # rewarded if the object is lifted above the threshold
     return distance < threshold
+
+    
+# def ee_hits_table(env, table_height: float, ee_frame_cfg=SceneEntityCfg("ee_frame")):
+#     ee   = env.scene[ee_frame_cfg.name]
+#     z_ee = ee.data.target_pos_w[..., 0, 2]
+#     return z_ee < table_height

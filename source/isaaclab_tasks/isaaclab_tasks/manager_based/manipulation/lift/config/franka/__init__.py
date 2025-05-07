@@ -9,6 +9,7 @@ from . import agents
 
 ##
 # Register Gym environments.
+# Integrate a custom environment into the OpenAI Gym framework.
 ##
 
 ##
@@ -18,7 +19,9 @@ from . import agents
 gym.register(
     id="Isaac-Lift-Cube-Franka-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    # Additional arguments passed to ManagerBasedRLEnv when created
     kwargs={
+        # Define the entry point for the environment configuration
         "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:FrankaCubeLiftEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_cfg.yaml",
