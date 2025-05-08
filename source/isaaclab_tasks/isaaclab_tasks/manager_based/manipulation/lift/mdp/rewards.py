@@ -37,11 +37,11 @@ def object_is_lifted(
     # lift_width controls the slope: smaller → sharper transition
     return torch.sigmoid((z - minimal_height) / lift_width)
 
-
+# Encourage robots end-effector to move closer to the object
 def object_ee_distance(
     env: ManagerBasedRLEnv,
     std: float,
-    bonus_threshold: float = 0.02,
+    bonus_threshold: float = 0.02, # If ee is closer than this distance to the object, a bonus is given
     bonus_weight: float = 0.3,
     object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
     ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
@@ -52,9 +52,10 @@ def object_ee_distance(
       R_bonus = bonus_weight if d < bonus_threshold else 0
       R = R_dist + R_bonus
     """
+    # Retrieve object and end-effector frame
     obj      = env.scene[object_cfg.name]
     ee_frame = env.scene[ee_frame_cfg.name]
-    # positions
+    # Positions, cube_pos and ee_pos are of shape [B, 3] where B is the number of parallel envs
     cube_pos = obj.data.root_pos_w[:, :3]
     ee_pos   = ee_frame.data.target_pos_w[..., 0, :]
     # Euclidean distance
@@ -129,18 +130,19 @@ def object_goal_distance_pos(
     # Scene handles
     robot = env.scene[robot_cfg.name]
     obj   = env.scene[object_cfg.name]
-    cmd   = env.command_manager.get_command(command_name)  # [B,7]
+    cmd   = env.command_manager.get_command(command_name)  # [B,7] robot command x,y,z,w,x,y,z
 
     # World-frame goal position via rotation-matrix
-    p_rb   = robot.data.root_state_w[:, :3]       # [B,3]
-    q_rb   = robot.data.root_state_w[:, 3:7]      # [B,4]
-    p_des_b= cmd[:, :3]                           # [B,3]
-    R_rb   = quat_to_rotmat(q_rb)                 # [B,3,3]
-    p_des_w= (R_rb @ p_des_b.unsqueeze(-1)).squeeze(-1) + p_rb  # [B,3]
+    p_rb   = robot.data.root_state_w[:, :3]       # [B,3] robot postion in the world frame
+    q_rb   = robot.data.root_state_w[:, 3:7]      # [B,4] robot orientation in the world frame
+    p_des_b= cmd[:, :3]                           # [B,3] desired goal position in the robot base frame
+    R_rb   = quat_to_rotmat(q_rb)                 # [B,3,3] Convert quaternion to rotation matrix
+    p_des_w= (R_rb @ p_des_b.unsqueeze(-1)).squeeze(-1) + p_rb  # [B,3] goal position in the world frame
 
     # Distance and Gaussian reward
     p_obj  = obj.data.root_pos_w[:, :3]
     dist   = torch.norm(p_obj - p_des_w, dim=1)
+    # Gaussian- shaped reward -> If dist is small, the reward is close to 1.0
     r_pos  = torch.exp(-0.5 * (dist / std)**2)
 
     # Soft lift gate

@@ -246,6 +246,12 @@ def action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
     return torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
 
+def action_rate_l2_no_gripper(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Penalize the rate of change of arm actions only, excluding gripper."""
+    # Gripper action is the last element of the action vector 
+    arm_action = env.action_manager.action[:, :-1]
+    prev_arm_action = env.action_manager.prev_action[:, :-1]
+    return torch.sum(torch.square(arm_action - prev_arm_action), dim=1)
 
 def action_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the actions using L2 squared kernel."""
@@ -255,7 +261,6 @@ def action_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
 """
 Contact sensor.
 """
-
 
 def undesired_contacts(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """Penalize undesired contacts as the number of violations that are above a threshold."""

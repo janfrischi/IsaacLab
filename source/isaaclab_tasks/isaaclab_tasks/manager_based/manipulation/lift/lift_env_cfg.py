@@ -21,24 +21,9 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransf
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.utils.noise.noise_cfg import GaussianNoiseCfg
 
 from . import mdp
-
-# Import general reward and penalty functions from core isaaclab
-from isaaclab.envs.mdp.rewards import (
-    is_terminated,
-    joint_torques_l2,
-    joint_acc_l2,
-    joint_vel_l2,
-    action_l2,
-    body_lin_acc_l2,
-    joint_vel_limits,
-    joint_deviation_l1,
-    flat_orientation_l2,
-    action_rate_l2,
-    joint_pos_limits,
-    applied_torque_limits,
-)
 
 ##
 # Scene definition
@@ -47,12 +32,14 @@ from isaaclab.envs.mdp.rewards import (
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
     """Configuration for the lift scene with a robot and an object."""
+    # Define the robot and object used in the scene
     robot: ArticulationCfg = MISSING
+    object: RigidObjectCfg | DeformableObjectCfg = MISSING
+    # Define all the frames used in the scene
     ee_frame: FrameTransformerCfg = MISSING
     object_frame: FrameTransformerCfg = MISSING
     robot_frame: FrameTransformerCfg = MISSING
-    object: RigidObjectCfg | DeformableObjectCfg = MISSING
-
+    
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
@@ -74,6 +61,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 # MDP settings
 ##
 
+# Define target pose for the object
 @configclass
 class CommandsCfg:
     """Command terms for the MDP."""
@@ -92,6 +80,7 @@ class CommandsCfg:
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
+    # Allow for both joint position and Differential inverse kinematics actions
     arm_action: mdp.JointPositionActionCfg | mdp.DifferentialInverseKinematicsActionCfg = MISSING
     gripper_action: mdp.BinaryJointPositionActionCfg = MISSING
 
@@ -102,20 +91,34 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        object_position = ObsTerm(func=mdp.object_position_in_robot_root_frame)
-        object_orientation = ObsTerm(func=mdp.object_orientation_in_robot_frame)
+
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            #noise=GaussianNoiseCfg(mean=0.0, std=0.01)
+        
+        )
+
+        object_position = ObsTerm(
+            func=mdp.object_position_in_robot_frame,
+            #noise=GaussianNoiseCfg(mean=0.0, std=0.01)
+        )
+        
+        object_orientation = ObsTerm(
+            func=mdp.object_orientation_in_robot_frame,
+            #noise=GaussianNoiseCfg(mean=0.0, std=0.02)
+        )
+
         target_object_position = ObsTerm(func=mdp.generated_commands, params={"command_name": "object_pose"})
+
         actions = ObsTerm(func=mdp.last_action)
-        # ee_height = ObsTerm(func=mdp.ee_height_to_table, params={"table_height": 0.0})
-
-
+        
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
 
     policy: PolicyCfg = PolicyCfg()
 
+# Reset the object position and orientation
 @configclass
 class EventCfg:
     """Configuration for events."""
@@ -164,6 +167,13 @@ class RewardsCfg:
         },
         weight=20.0,
     )
+
+    # Dense reward for lifting
+    lift_shaping = RewTerm(
+        func=mdp.potential_based_lift,
+        params={"minimal_height": 0.04, "object_cfg": SceneEntityCfg("object")},
+        weight=9.1,
+    )
     
     pos_reward = RewTerm(
         func=mdp.object_goal_distance_pos,
@@ -189,39 +199,8 @@ class RewardsCfg:
         weight=0.0,   # Adjust as needed based on other rewards
     )
     
-    # ori_reward = RewTerm(
-    #     func=mdp.object_goal_distance_ori,
-    #     params={
-    #         "std":          0.2,
-    #         "command_name":"object_pose",
-    #         "robot_cfg":      SceneEntityCfg("robot"),
-    #         "object_cfg":     SceneEntityCfg("object"),
-    #     },
-    #     weight=0.0,  # start at 0 and ramp up via curriculum
-    # )
-    
-    # slip_penalty = RewTerm(
-    # func=mdp.object_slip_penalty_norm,
-    # params={"threshold": 0.01, "object_cfg": SceneEntityCfg("object"), "ee_frame_cfg": SceneEntityCfg("ee_frame")},
-    # weight=-0.2,     # so slip=thr ⇒ penalty≈−0.2
-    # )
-    
-    lift_shaping = RewTerm(
-        func=mdp.potential_based_lift,
-        params={"minimal_height": 0.04, "object_cfg": SceneEntityCfg("object")},
-        weight=9.1,    # so full-lift ⇒ ≈+1.0 total shaping
-    )
-
-    # table_penalty = RewTerm(
-    # func=mdp.ee_table_penalty,
-    # params={"table_height": 0.0},
-    # weight=0.0,
-    # )
-
-
-
-    # action penalty
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
+    # Action rate penalty -> Penalize only arm joint actions
+    action_rate = RewTerm(func=mdp.action_rate_l2_no_gripper, weight=-1e-4)
 
     # joint velocity penalty
     joint_vel = RewTerm(
@@ -237,13 +216,6 @@ class RewardsCfg:
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
     
-    # # multiple grasp attempts penalty
-    # multi_grasp_penalty = RewTerm(
-    #     func=mdp.multiple_grasp_attempts_penalty, 
-    #     params={"penalty_per_attempt": 0.5},  
-    #     weight=-1e-4
-    # )
-
 
 @configclass
 class TerminationsCfg:
@@ -255,16 +227,12 @@ class TerminationsCfg:
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
     )
     
-    # table_collision = DoneTerm(
-    # func=mdp.ee_hits_table, params={"table_height": 0.0}
-    # )
-
-
 
 @configclass
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
     
+    # Start with a high weight for the reach term and gradually reduce it
     reach = CurrTerm(
         # num_steps = iterations * num_steps_per_env
         func=mdp.gradually_modify_reward_weight, params={
@@ -277,6 +245,7 @@ class CurriculumCfg:
         }
     )
     
+    # Ramp and decay the positive reward for the object position
     pos_reward_ramp = CurrTerm(
         func=mdp.gradually_modify_reward_weight, params={
             "term_name": "pos_reward",
@@ -310,72 +279,17 @@ class CurriculumCfg:
         }
     )
     
-    # slip_penalty_ramp = CurrTerm(
-    #     func=mdp.gradually_modify_reward_weight,
-    #     params={
-    #         "term_name": "slip_penalty",
-    #         "start_weight": 0.0,
-    #         "end_weight": -0.2,
-    #         "num_steps": 1000 * 24,
-    #         "curve_type": "linear",
-    #         "start_step": 1000 * 24,
-    #     }
-    # )
-    
     lift_shaping = CurrTerm(
         func= mdp.gradually_modify_reward_weight,
         params={
             "term_name": "lift_shaping",
-            "start_weight": 9.1,
-            "end_weight": 0.0,
+            "start_weight": 9.1, # High initial weight
+            "end_weight": 0.0, # Gradually reduce to 0
             "num_steps": 1500 * 24,
             "curve_type": "linear",
             "start_step": 1500 * 24,
         }
     )
-    
-    # table_penalty_ramp = CurrTerm(
-    # func=mdp.gradually_modify_reward_weight,
-    # params={
-    #     "term_name": "table_penalty",
-    #     "start_weight": 0.0,
-    #     "end_weight":   1.0,
-    #     "num_steps":    1000*24,
-    #     "curve_type":   "linear",
-    #     "start_step":   1500,
-    #     },
-    # )
-
-    
-    # # Increase the weight of the multi-grasp penalty term
-    # multi_grasp_penalty = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.modify_reward_weight, params={
-    #         "term_name": "multi_grasp_penalty",
-    #         "weight": -5.0,
-    #         "num_steps": 1000 * 24,
-    #     }
-    # )
-    
-    # # Increase the weight of the multi-grasp penalty term
-    # multi_grasp_penalty = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.gradually_modify_reward_weight, params={
-    #         "term_name": "multi_grasp_penalty",
-    #         "start_weight": -1e-4,
-    #         "end_weight": -20.0,
-    #         "num_steps": 1000 * 24,
-    #         "curve_type": "logarithmic",
-    #         "start_step": 650 * 24,
-    #     }
-    # )
-    
-    # # Remove the reaching object term
-    # reaching_object = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.modify_reward_weight, params={"term_name": "reaching_object", "weight": 0.0, "num_steps": 2000 * 24}
-    # )
-    
     
     action_rate = CurrTerm(
         func=mdp.gradually_modify_reward_weight, params={
@@ -399,24 +313,6 @@ class CurriculumCfg:
         }
     )
     
-    # # Sudden increase the weight of the action rate term
-    # action_rate = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.modify_reward_weight, params={"term_name": "action_rate", "weight": -1e-1, "num_steps": 2500 * 24}
-    # )
-
-    # joint_vel = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.modify_reward_weight, params={"term_name": "joint_vel", "weight": -1e-1, "num_steps": 2500 * 24} 
-    # )
-    
-    # joint_acc = CurrTerm(
-    #     # num_steps = iterations * num_steps_per_env
-    #     func=mdp.modify_reward_weight, params={"term_name": "joint_acc", "weight": -1e-4, "num_steps": 1000 * 24} 
-    # )
-    
-
-
 ##
 # Environment configuration
 ##
