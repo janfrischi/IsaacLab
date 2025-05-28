@@ -15,6 +15,7 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 from isaaclab_tasks.manager_based.manipulation.stack import mdp
 from isaaclab_tasks.manager_based.manipulation.stack.mdp import franka_stack_events
+# stack_joint_pos_env_cfg inherits from stack_env_cfg
 from isaaclab_tasks.manager_based.manipulation.stack.stack_env_cfg import StackEnvCfg
 
 ##
@@ -22,29 +23,32 @@ from isaaclab_tasks.manager_based.manipulation.stack.stack_env_cfg import StackE
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
+from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG  # Add this import
+
+"""Inherits from the stack_env_cfg and specializes the config for joint position control."""
 
 
 @configclass
 class EventCfg:
     """Configuration for events."""
 
-    init_franka_arm_pose = EventTerm(
-        func=franka_stack_events.set_default_joint_pose,
-        mode="startup",
-        params={
-            "default_pose": [0.0444, -0.1894, -0.1107, -2.5148, 0.0044, 2.3775, 0.6952, 0.0400, 0.0400],
-        },
-    )
+    # init_franka_arm_pose = EventTerm(
+    #     func=franka_stack_events.set_default_joint_pose,
+    #     mode="startup",
+    #     params={
+    #         "default_pose": [0.0444, -0.1894, -0.1107, -2.5148, 0.0044, 2.3775, 0.6952, 0.0400, 0.0400],
+    #     },
+    # )
 
-    randomize_franka_joint_state = EventTerm(
-        func=franka_stack_events.randomize_joint_by_gaussian_offset,
-        mode="reset",
-        params={
-            "mean": 0.0,
-            "std": 0.02,
-            "asset_cfg": SceneEntityCfg("robot"),
-        },
-    )
+    # randomize_franka_joint_state = EventTerm(
+    #     func=franka_stack_events.randomize_joint_by_gaussian_offset,
+    #     mode="reset",
+    #     params={
+    #         "mean": 0.0,
+    #         "std": 0.02,
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #     },
+    # )
 
     randomize_cube_positions = EventTerm(
         func=franka_stack_events.randomize_object_pose,
@@ -66,20 +70,27 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         # Set events
         self.events = EventCfg()
 
-        # Set Franka as robot
-        self.scene.robot = FRANKA_PANDA_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        # Set Franka as robot - use real robot configuration
+        self.scene.robot = FRANKA_PANDA_REAL_ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]
-
+        
+        # Set the robot with a fixed base
+        #self.scene.robot.spawn.fixed_base = True
         # Add semantics to table
         self.scene.table.spawn.semantic_tags = [("class", "table")]
 
         # Add semantics to ground
         self.scene.plane.semantic_tags = [("class", "ground")]
 
-        # Set actions for the specific robot type (franka)
+        # Set actions for the specific robot type (franka) -> Action space is joint position
+        # Arm actions
         self.actions.arm_action = mdp.JointPositionActionCfg(
-            asset_name="robot", joint_names=["panda_joint.*"], scale=0.5, use_default_offset=True
+            asset_name="robot", 
+            joint_names=["panda_joint.*"], 
+            scale=1, 
+            use_default_offset=False # Absolute joint position control, no offset needed
         )
+        # Gripper actions
         self.actions.gripper_action = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
             joint_names=["panda_finger.*"],

@@ -201,9 +201,37 @@ def main():
                                 episode_names[next_episode_index], env.device
                             )
                             env_episode_data_map[env_id] = episode_data
-                            # Set initial state for the new episode
+
+                            # Extract the initial state from the dataset
                             initial_state = episode_data.get_initial_state()
-                            env.reset_to(initial_state, torch.tensor([env_id], device=env.device), is_relative=True)
+
+                            # Use the complete initial state from the dataset
+                            if initial_state is not None:
+                                print(f"Resetting environment {env_id} to initial state from dataset")
+                                
+                                # Print the actual initial state data
+                                print("Initial state contents:")
+                                for asset_type, assets in initial_state.items():
+                                    print(f"  {asset_type}:")
+                                    for asset_name, asset_data in assets.items():
+                                        print(f"    {asset_name}:")
+                                        for state_key, state_value in asset_data.items():
+                                            if hasattr(state_value, 'cpu'):
+                                                state_array = state_value.cpu().numpy()
+                                                if state_array.size > 10:  # If array is large, show shape and first few values
+                                                    print(f"      {state_key}: shape={state_array.shape}, first_values=[{', '.join([f'{val:.6f}' for val in state_array.flatten()[:5]])}...]")
+                                                else:
+                                                    state_str = ", ".join([f"{val:.6f}" for val in state_array.flatten()])
+                                                    print(f"      {state_key}: [{state_str}]")
+                                            else:
+                                                print(f"      {state_key}: {state_value}")
+                                
+                                env.reset_to(initial_state, torch.tensor([env_id], device=env.device), is_relative=False)
+                            else:
+                                # Fallback to regular reset if no initial state is available
+                                print(f"No initial state found in dataset, using regular reset for env_{env_id}")
+                                env.reset(torch.tensor([env_id], device=env.device))
+
                             # Get the first action for the new episode
                             env_next_action = env_episode_data_map[env_id].get_next_action()
                             has_next_action = True
@@ -219,6 +247,50 @@ def main():
                         env.sim.render()
                         continue
                 env.step(actions)
+
+                # Comprehensive logging for debugging
+                current_state = env.scene.get_state(is_relative=False)
+                
+                # With absolute joint control, actions directly represent desired joint positions
+                for env_idx in range(num_envs):
+                    if env_idx in env_episode_data_map and env_episode_data_map[env_idx].next_action_index > 0:
+                        episode_data = env_episode_data_map[env_idx]
+                        action_step = episode_data.next_action_index - 1
+                        
+                        print(f"\n🤖 Environment {env_idx} | Step {action_step}")
+                        print("-" * 40)
+                        
+                        # Action is now absolute joint position target
+                        applied_action = actions[env_idx].cpu().numpy()
+                        action_str = ", ".join([f"{val:.6f}" for val in applied_action])
+                        print(f"📝 Target Action: [{action_str}]")
+                        
+                        # Current joint positions should move toward target
+                        if "articulation" in current_state and "robot" in current_state["articulation"]:
+                            joint_pos = current_state["articulation"]["robot"]["joint_position"][env_idx].cpu().numpy()
+                            joint_pos_str = ", ".join([f"{val:.6f}" for val in joint_pos])
+                            print(f"🔧 Current Joint Positions: [{joint_pos_str}]")
+                            
+                            # Split into arm and gripper for comparison
+                            arm_action = applied_action[:7]  # First 7 elements are arm joints
+                            arm_positions = joint_pos[:7]   # First 7 elements are arm joints
+                            
+                            # Show arm joint errors
+                            arm_error = arm_action - arm_positions
+                            arm_error_str = ", ".join([f"{val:.6f}" for val in arm_error])
+                            print(f"📏 Arm Position Error: [{arm_error_str}]")
+                            
+                            # Handle gripper separately
+                            if len(applied_action) > 7:
+                                gripper_action = applied_action[7]  # Single gripper action
+                                gripper_positions = joint_pos[7:9]  # Two gripper joint positions
+                                gripper_pos_str = ", ".join([f"{val:.6f}" for val in gripper_positions])
+                                print(f"🤏 Gripper Action: {gripper_action:.6f}")
+                                print(f"🤏 Gripper Positions: [{gripper_pos_str}]")
+                                
+                                # Gripper error (action applies to both fingers)
+                                gripper_error = gripper_action - gripper_positions[0]  # Compare to one finger
+                                print(f"📏 Gripper Error: {gripper_error:.6f}")
 
                 if state_validation_enabled:
                     state_from_dataset = env_episode_data_map[0].get_next_state()

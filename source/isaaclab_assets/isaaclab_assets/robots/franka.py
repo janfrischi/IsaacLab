@@ -31,7 +31,7 @@ FRANKA_PANDA_CFG = ArticulationCfg(
             max_depenetration_velocity=5.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=0
+            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=0, fix_root_link=True
         ),
         # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.005, rest_offset=0.0),
     ),
@@ -84,4 +84,74 @@ FRANKA_PANDA_HIGH_PD_CFG.actuators["panda_forearm"].damping = 80.0
 """Configuration of Franka Emika Panda robot with stiffer PD control.
 
 This configuration is useful for task-space control using differential IK.
+"""
+
+
+FRANKA_PANDA_REAL_ROBOT_CFG = FRANKA_PANDA_CFG.copy()
+FRANKA_PANDA_REAL_ROBOT_CFG.spawn.rigid_props.disable_gravity = True  # Match typical robot control
+FRANKA_PANDA_REAL_ROBOT_CFG.actuators = {
+    # Joints 1-4: Higher stiffness (shoulder/elbow region)
+    "panda_joint1": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint1"],
+        effort_limit=87.0,
+        velocity_limit=2.175,
+        stiffness=400.0,  # Match your kp[0]
+        damping=40.0,     # Reasonable damping (10% of stiffness)
+    ),
+    "panda_joint2": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint2"],
+        effort_limit=87.0,
+        velocity_limit=2.175,
+        stiffness=400.0,  # Match your kp[1]
+        damping=40.0,
+    ),
+    "panda_joint3": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint3"],
+        effort_limit=87.0,
+        velocity_limit=2.175,
+        stiffness=400.0,  # Match your kp[2]
+        damping=40.0,
+    ),
+    "panda_joint4": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint4"],
+        effort_limit=87.0,
+        velocity_limit=2.175,
+        stiffness=300.0,  # Match your kp[3]
+        damping=30.0,
+    ),
+    # Joints 5-7: Lower stiffness (wrist region)
+    "panda_joint5": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint5"],
+        effort_limit=12.0,
+        velocity_limit=2.61,
+        stiffness=60.0,   # Match your kp[4]
+        damping=6.0,
+    ),
+    "panda_joint6": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint6"],
+        effort_limit=12.0,
+        velocity_limit=2.61,
+        stiffness=40.0,   # Match your kp[5]
+        damping=4.0,
+    ),
+    "panda_joint7": ImplicitActuatorCfg(
+        joint_names_expr=["panda_joint7"],
+        effort_limit=12.0,
+        velocity_limit=2.61,
+        stiffness=10.0,   # Match your kp[6]
+        damping=1.0,
+    ),
+    # Gripper
+    "panda_hand": ImplicitActuatorCfg(
+        joint_names_expr=["panda_finger_joint.*"],
+        effort_limit=200.0,
+        velocity_limit=0.2,
+        stiffness=2e3,
+        damping=1e2,
+    ),
+}
+"""Configuration of Franka Emika Panda robot matching real robot joint stiffnesses.
+
+This configuration uses the exact joint-specific stiffness values used on the real robot:
+kp = [400, 400, 400, 300, 60, 40, 10] N⋅m/rad
 """

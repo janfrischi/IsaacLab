@@ -21,6 +21,9 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 from . import mdp
 
+"""This file defines the foundational configuration for the stack environment.
+It includes the scene configuration, MDP settings, and event configurations."""
+
 
 ##
 # Scene definition
@@ -186,6 +189,7 @@ class StackEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
+        # Control frequency is 20Hz (50ms), decimation is 5, so simulation runs at 100Hz (10ms)
         self.decimation = 5
         self.episode_length_s = 30.0
         # simulation settings

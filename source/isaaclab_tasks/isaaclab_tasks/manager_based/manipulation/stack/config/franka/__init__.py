@@ -67,6 +67,7 @@ gym.register(
     disable_env_checker=True,
 )
 
+# Environment with absolute IK control for Franka Emika Panda robot -> Ideal for imitation learning with BC
 gym.register(
     id="Isaac-Stack-Cube-Franka-IK-Abs-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",

@@ -20,7 +20,7 @@ from isaaclab_tasks.manager_based.manipulation.lift.lift_env_cfg import LiftEnvC
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
 
-# FrankaCubeLiftEnvCfg inherits from LiftEnvCfg "General lift taks structure"
+# FrankaCubeLiftEnvCfg inherits from LiftEnvCfg "General lift taks structure" that is defined in lift_env_cfg.py
 @configclass
 class FrankaCubeLiftEnvCfg(LiftEnvCfg):
     def __post_init__(self):
@@ -31,17 +31,22 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
         self.scene.robot = FRANKA_PANDA_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
         # Set actions for the specific robot type (franka)
-        # Use joint position control for the arm
+        # Use joint position control for the arm / scale factor for the action
         self.actions.arm_action = mdp.JointPositionActionCfg(
-            asset_name="robot", joint_names=["panda_joint.*"], scale=0.5, use_default_offset=True
+            asset_name="robot", 
+            joint_names=["panda_joint.*"], 
+            scale=0.5, 
+            use_default_offset=True # use the default offset for the joint positions
         )
+        
         self.actions.gripper_action = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
             joint_names=["panda_finger.*"],
             open_command_expr={"panda_finger_.*": 0.04},
             close_command_expr={"panda_finger_.*": 0.0},
         )
-        # Set the body name for the end effector
+
+        # Set the body name for the end effector for which the the command is applied
         self.commands.object_pose.body_name = "panda_hand"
         
         
@@ -90,23 +95,23 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
         marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
         marker_cfg.prim_path = "/Visuals/FrameTransformer"
         
-        marker_cfg_object = marker_cfg.copy()   # or create a new config if needed
-        
-        # Add the object frame transformer configuration -> Track and visualize the pose of the object
+        ### Define the coordinate frames for visualization
+
+        # Object coordinate frame
         self.scene.object_frame = FrameTransformerCfg(
             prim_path="{ENV_REGEX_NS}/Object",  # same prim as the object
             debug_vis=True, # enable debug visualization
-            visualizer_cfg=marker_cfg_object,
+            visualizer_cfg=marker_cfg,
             target_frames=[
                 FrameTransformerCfg.FrameCfg(
-                    prim_path="{ENV_REGEX_NS}/Object",  # if your object USD has a specific frame, use it here
+                    prim_path="{ENV_REGEX_NS}/Object",
                     name="object_origin",
                     offset=OffsetCfg(pos=[0.0, 0.0, 0.0]),
                 ),
             ],
         )
         
-        
+        # End effector coordinate frame
         self.scene.ee_frame = FrameTransformerCfg(
             prim_path="{ENV_REGEX_NS}/Robot/panda_link0",
             debug_vis=True,
@@ -122,8 +127,7 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
             ],
         )
         
-        
-        # visualize robot frame
+        # Robot coordinate frame
         self.scene.robot_frame = FrameTransformerCfg(
             prim_path="{ENV_REGEX_NS}/Robot/panda_link0",
             debug_vis=True,

@@ -142,7 +142,6 @@ def object_goal_distance_pos(
     # Distance and Gaussian reward
     p_obj  = obj.data.root_pos_w[:, :3]
     dist   = torch.norm(p_obj - p_des_w, dim=1)
-    # Gaussian- shaped reward -> If dist is small, the reward is close to 1.0
     r_pos  = torch.exp(-0.5 * (dist / std)**2)
 
     # Soft lift gate

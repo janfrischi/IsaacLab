@@ -29,6 +29,7 @@ from . import mdp
 # Scene definition
 ##
 
+# All the MISSING variables are defined in the joint_pos_env_cfg.py file "Specific configurations for the robot"
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
     """Configuration for the lift scene with a robot and an object."""
@@ -68,7 +69,7 @@ class CommandsCfg:
 
     object_pose = mdp.UniformPoseCommandCfg(
         asset_name="robot",
-        body_name=MISSING,
+        body_name=MISSING, # Define in joint_pos_env_cfg.py
         resampling_time_range=(5.0, 5.0),
         debug_vis=True,
         ranges=mdp.UniformPoseCommandCfg.Ranges(
@@ -178,14 +179,14 @@ class RewardsCfg:
     pos_reward = RewTerm(
         func=mdp.object_goal_distance_pos,
         params={
-            "std":           0.3,
+            "std":           0.05, #changed from 0.3
             "minimal_height":0.04,
             "lift_width":    0.01,
             "command_name":  "object_pose",
             "robot_cfg":      SceneEntityCfg("robot"),
             "object_cfg":     SceneEntityCfg("object"),
         },
-        weight=10.0,
+        weight=15.0, #changed from 10.0
     )
     
     ori_reward = RewTerm(
@@ -238,7 +239,7 @@ class CurriculumCfg:
         func=mdp.gradually_modify_reward_weight, params={
             "term_name": "reach",
             "start_weight": 7.0,
-            "end_weight": 0.0,
+            "end_weight": 0.0, # TODO: Check whether positive reward is needed
             "num_steps": 2000 * 24,
             "curve_type": "linear",
             "start_step": 100 * 24,
@@ -272,10 +273,10 @@ class CurriculumCfg:
         func=mdp.gradually_modify_reward_weight, params={
             "term_name": "ori_reward",
             "start_weight": 0.0,
-            "end_weight": 20.0,
+            "end_weight": 30.0, # We raised this from 20.0
             "num_steps": 3000 * 24,
             "curve_type": "linear",
-            "start_step": 500 * 24,
+            "start_step": 250 * 24, # before 500
         }
     )
     
@@ -291,6 +292,7 @@ class CurriculumCfg:
         }
     )
     
+    # Penalize the action rate
     action_rate = CurrTerm(
         func=mdp.gradually_modify_reward_weight, params={
             "term_name": "action_rate",
@@ -302,6 +304,7 @@ class CurriculumCfg:
         }
     )
     
+    # Penalize the joint velocity
     joint_vel = CurrTerm(
         func=mdp.gradually_modify_reward_weight, params={
             "term_name": "joint_vel",
