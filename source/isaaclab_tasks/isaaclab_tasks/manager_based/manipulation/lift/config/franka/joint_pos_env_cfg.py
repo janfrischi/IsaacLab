@@ -19,6 +19,7 @@ from isaaclab_tasks.manager_based.manipulation.lift.lift_env_cfg import LiftEnvC
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
+from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG  # Add this import
 
 # FrankaCubeLiftEnvCfg inherits from LiftEnvCfg "General lift taks structure" that is defined in lift_env_cfg.py
 @configclass
@@ -49,29 +50,6 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
         # Set the body name for the end effector for which the the command is applied
         self.commands.object_pose.body_name = "panda_hand"
         
-        
-        # # Set Cone as object
-        # self.scene.object = RigidObjectCfg(
-        #     prim_path="{ENV_REGEX_NS}/Object",
-        #     # Adjust initial position/rotation if needed for the cone's size/origin
-        #     init_state=RigidObjectCfg.InitialStateCfg(pos=[0.5, 0, 0.000], rot=      [1, 0, 0, 0]),
-        #     spawn=UsdFileCfg(
-        #         # Make sure this path points correctly to your converted cone.usd file
-        #         usd_path="assets/my_custom_assets/usd/cone.usd",
-        #         # Remove or adjust scale if cone.usd is already in meters
-        #         # scale=(1.0, 1.0, 1.0), # Example: No scaling if cone.usd is in meters
-        #         rigid_props=RigidBodyPropertiesCfg(
-        #             solver_position_iteration_count=16,
-        #             solver_velocity_iteration_count=1,
-        #             max_angular_velocity=1000.0,
-        #             max_linear_velocity=1000.0,
-        #             max_depenetration_velocity=5.0,
-        #             disable_gravity=False,
-        #         ),
-        #     ),
-        # )
-
-
         # Set Cube as object
         self.scene.object = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Object",

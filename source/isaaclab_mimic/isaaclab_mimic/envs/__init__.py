@@ -18,6 +18,8 @@ from .franka_stack_ik_rel_visuomotor_mimic_env_cfg import FrankaCubeStackIKRelVi
 # Inverse Kinematics - Relative Pose Control
 ##
 
+# Here we register the mimic environments for the Franka Cube Stack task with different configurations.
+
 gym.register(
     id="Isaac-Stack-Cube-Franka-IK-Rel-Mimic-v0",
     entry_point="isaaclab_mimic.envs:FrankaCubeStackIKRelMimicEnv",

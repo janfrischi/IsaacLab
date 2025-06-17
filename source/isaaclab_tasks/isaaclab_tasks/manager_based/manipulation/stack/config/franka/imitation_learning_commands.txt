@@ -1,0 +1,19 @@
+1. Replay demonstrations
+python /home/pdzuser/IsaacLab/scripts/tools/replay_demos.py --task Isaac-Stack-Cube-Franka-IK-Abs-v0  --dataset_file ./datasets/...
+
+2. Annotate Dataset for MimicGen / IsaacLabMimic
+./isaaclab.sh -p scripts/imitation_learning/isaaclab_mimic/annotate_demos.py --device cuda --task Isaac-Stack-Cube-Franka-IK-Abs-Mimic-v0 --input_file ./datasets/dataset_06_06.hdf5 --output_file ./datasets/annotated_dataset_06_06.hdf5
+
+3. Generate Dataset with IsaacLabMimic
+
+3.1 Test Generation with 10 Trials
+./isaaclab.sh -p scripts/imitation_learning/isaaclab_mimic/generate_dataset.py --device cuda --num_envs 10 --generation_num_trials 10 --input_file ./datasets/annotated_dataset_06_06.hdf5 --output_file ./datasets/generated_dataset_small_06_06.hdf5
+
+3.2 Generation of 1000 trajectories and 100 envs in parallel
+./isaaclab.sh -p scripts/imitation_learning/isaaclab_mimic/generate_dataset.py --device cuda --num_envs 100 --generation_num_trials 1000 --headless --input_file ./datasets/annotated_dataset_06_06.hdf5 --output_file ./datasets/generated_dataset_06_06.hdf5
+
+4. Train BC-Agent
+./isaaclab.sh -p scripts/imitation_learning/robomimic/train.py --task Isaac-Stack-Cube-Franka-IK-Abs-v0 --algo bc --dataset ./datasets/generated_dataset_06_06.hdf5
+
+5. Validate trained BC-Policy
+./isaaclab.sh -p scripts/imitation_learning/robomimic/play.py --device cuda --task Isaac-Stack-Cube-Franka-IK-Abs-v0 --num_rollouts 100 --checkpoint /home/pdzuser/IsaacLab/logs/robomimic/Isaac-Stack-Cube-Franka-IK-Abs-v0/bc_rnn_low_dim_franka_stack/20250610170408/models/model_epoch_2000.pth

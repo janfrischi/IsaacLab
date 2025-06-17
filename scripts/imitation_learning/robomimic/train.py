@@ -171,7 +171,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
 
     # load basic metadata from training file
     print("\n============= Loaded Environment Metadata =============")
-    env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=config.train.data)
+    env_meta = FileUtils.get_env_metadata_from_dataset(config.train.data)
     shape_meta = FileUtils.get_shape_metadata_from_dataset(
         dataset_path=config.train.data, all_obs_keys=config.all_obs_keys, verbose=True
     )
@@ -427,6 +427,8 @@ if __name__ == "__main__":
     parser.add_argument("--algo", type=str, default=None, help="Name of the algorithm.")
     parser.add_argument("--log_dir", type=str, default="robomimic", help="Path to log directory")
     parser.add_argument("--normalize_training_actions", action="store_true", default=False, help="Normalize actions")
+    # Add this new argument
+    parser.add_argument("--num_epochs", type=int, default=None, help="Number of training epochs")
 
     args = parser.parse_args()
 

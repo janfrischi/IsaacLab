@@ -50,7 +50,7 @@ def cubes_stacked(
     h_dist_c12 = torch.norm(pos_diff_c12[:, 2:], dim=1)
     h_dist_c23 = torch.norm(pos_diff_c23[:, 2:], dim=1)
 
-    # Check cube positions
+    # Check cube positions -> Use logical_and to combine conditions, every single criterion must be satisfied simultaneously
     stacked = torch.logical_and(xy_dist_c12 < xy_threshold, xy_dist_c23 < xy_threshold)
     stacked = torch.logical_and(h_dist_c12 - height_diff < height_threshold, stacked)
     stacked = torch.logical_and(h_dist_c23 - height_diff < height_threshold, stacked)

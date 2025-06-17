@@ -91,7 +91,7 @@ def rollout(policy, env, success_term, horizon, device):
 
     for i in range(horizon):
         # Prepare observations
-        obs = copy.deepcopy(obs_dict["policy"])
+        obs = copy.deepcopy(obs_dict["policy"]) # Access the PolicyCfg observations
         for ob in obs:
             obs[ob] = torch.squeeze(obs[ob])
 
@@ -107,10 +107,67 @@ def rollout(policy, env, success_term, horizon, device):
                     image = image.clip(0.0, 1.0)
                     obs[image_name] = image
 
-        traj["obs"].append(obs)
+        # Filter observations to match training configuration
+        training_obs_keys = ["eef_pos", "eef_quat", "gripper_pos", "object"]
+        filtered_obs = {key: obs[key] for key in training_obs_keys if key in obs}
+        
+        # Verify all required observations are present
+        missing_keys = set(training_obs_keys) - set(filtered_obs.keys())
+        if missing_keys:
+            raise ValueError(f"Missing required observation keys: {missing_keys}")
 
-        # Compute actions
-        actions = policy(obs)
+        # Print filtered observations for debugging
+        if i % 10 == 0:  # Print every 10 steps to avoid spam
+            print(f"\n[INFO] Step {i} - Training-matched observations:")
+            print("=" * 60)
+            total_dims = 0
+            for obs_key, obs_value in filtered_obs.items():
+                if isinstance(obs_value, torch.Tensor):
+                    print(f"\n  {obs_key.upper()}:")
+                    print(f"    Shape: {obs_value.shape}")
+                    print(f"    Dtype: {obs_value.dtype}")
+                    print(f"    Device: {obs_value.device}")
+                    
+                    # Print values based on observation type
+                    if obs_key in ["eef_pos", "eef_quat", "gripper_pos"]:
+                        # These are small, print all values
+                        values = obs_value.cpu().numpy()
+                        print(f"    Values: {values.tolist()}")
+                        if obs_key == "eef_pos":
+                            print(f"    Position (x,y,z): [{values[0]:.4f}, {values[1]:.4f}, {values[2]:.4f}]")
+                        elif obs_key == "eef_quat":
+                            print(f"    Quaternion (w,x,y,z): [{values[0]:.4f}, {values[1]:.4f}, {values[2]:.4f}, {values[3]:.4f}]")
+                        elif obs_key == "gripper_pos":
+                            print(f"    Gripper joints: [{values[0]:.4f}, {values[1]:.4f}]")
+                    
+                    elif obs_key == "object":
+                        # This is large (39 dims), print summary
+                        values = obs_value.cpu().numpy()
+                        print(f"    Values (all Values): {values[:39].tolist()}")
+                    
+                    else:
+                        # Generic handling for other observations
+                        if obs_value.numel() <= 10:
+                            print(f"    Values: {obs_value.cpu().numpy().tolist()}")
+                        else:
+                            values = obs_value.flatten().cpu().numpy()
+                            print(f"    Values (first 5): {values[:5].tolist()}")
+                            print(f"    Values (last 5):  {values[-5:].tolist()}")
+                            print(f"    Min/Max: [{values.min():.4f}, {values.max():.4f}]")
+                    
+                    total_dims += obs_value.numel()
+                else:
+                    print(f"\n  {obs_key.upper()}: {type(obs_value)} = {obs_value}")
+            
+            print(f"\n  SUMMARY:")
+            print(f"    Total observation keys: {len(filtered_obs)}")
+            print(f"    Total dimensions: {total_dims} (expected: 48)")
+            print("=" * 60)
+
+        traj["obs"].append(filtered_obs)
+
+        # Compute actions using filtered observations
+        actions = policy(filtered_obs) 
 
         # Unnormalize actions
         if args_cli.norm_factor_min is not None and args_cli.norm_factor_max is not None:
@@ -119,6 +176,10 @@ def rollout(policy, env, success_term, horizon, device):
             ) / 2 + args_cli.norm_factor_min
 
         actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
+
+        # Print actions for debugging
+        if i % 10 == 0:
+            print(f"[INFO] Step {i}, Actions: {actions.tolist()}")
 
         # Apply actions
         obs_dict, _, terminated, truncated, _ = env.step(actions)

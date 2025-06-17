@@ -23,38 +23,42 @@ from isaaclab_tasks.manager_based.manipulation.stack.stack_env_cfg import StackE
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
-from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG  # Add this import
+# Import the real robot configuration
+from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG
 
-"""Inherits from the stack_env_cfg and specializes the config for joint position control."""
+"""Inherits from the StackEnvCfg "base env for stacking task" and specializes the config for joint position control."""
 
-
+# EventCfg is used to define randomization and reset behaviour of the environment.
 @configclass
 class EventCfg:
     """Configuration for events."""
 
-    # init_franka_arm_pose = EventTerm(
-    #     func=franka_stack_events.set_default_joint_pose,
-    #     mode="startup",
-    #     params={
-    #         "default_pose": [0.0444, -0.1894, -0.1107, -2.5148, 0.0044, 2.3775, 0.6952, 0.0400, 0.0400],
-    #     },
-    # )
+    init_franka_arm_pose = EventTerm(
+        func=franka_stack_events.set_default_joint_pose,
+        mode="reset",
+        params={
+            "default_pose": [0.0444, -0.1894, -0.1107, -2.5148, 0.0044, 2.3775, 0.6952, 0.0400, 0.0400],
+        },
+    )
 
-    # randomize_franka_joint_state = EventTerm(
-    #     func=franka_stack_events.randomize_joint_by_gaussian_offset,
-    #     mode="reset",
-    #     params={
-    #         "mean": 0.0,
-    #         "std": 0.02,
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #     },
-    # )
+    randomize_franka_joint_state = EventTerm(
+        func=franka_stack_events.randomize_joint_by_gaussian_offset,
+        mode="reset",
+        params={
+            "mean": 0.0,
+            "std": 0.02,
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
 
+    # Randomize cubes for data generation
     randomize_cube_positions = EventTerm(
         func=franka_stack_events.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.4, 0.6), "y": (-0.10, 0.10), "z": (0.0203, 0.0203), "yaw": (-1.0, 1, 0)},
+            # "pose_range": {"x": (0.4, 0.6), "y": (-0.10, 0.10), "z": (0.0203, 0.0203), "yaw": (-1.0, 1, 0)},
+            # We had to change yaw to 3.1415 to match the convention of the recording!
+            "pose_range": {"x": (0.4, 0.6), "y": (-0.3, 0.3), "z": (0.0203, 0.0203), "yaw": (3.1415, 3.1415, 0)},
             "min_separation": 0.1,
             "asset_cfgs": [SceneEntityCfg("cube_1"), SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
@@ -70,26 +74,24 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         # Set events
         self.events = EventCfg()
 
-        # Set Franka as robot - use real robot configuration
+        # Fill in the missing components of the base config: Set real franka configuration as robot
         self.scene.robot = FRANKA_PANDA_REAL_ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
+        self.scene.robot.spawn.semantic_tags = [("class", "robot")]  # type: ignore
         
-        # Set the robot with a fixed base
-        #self.scene.robot.spawn.fixed_base = True
         # Add semantics to table
-        self.scene.table.spawn.semantic_tags = [("class", "table")]
+        self.scene.table.spawn.semantic_tags = [("class", "table")]  # type: ignore
 
         # Add semantics to ground
-        self.scene.plane.semantic_tags = [("class", "ground")]
+        self.scene.plane.semantic_tags = [("class", "ground")]  # type: ignore
 
         # Set actions for the specific robot type (franka) -> Action space is joint position
-        # Arm actions
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot", 
             joint_names=["panda_joint.*"], 
             scale=1, 
             use_default_offset=False # Absolute joint position control, no offset needed
         )
+
         # Gripper actions
         self.actions.gripper_action = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
@@ -111,7 +113,7 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         # Set each stacking cube deterministically
         self.scene.cube_1 = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Cube_1",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.4, 0.0, 0.0203], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.4, 0.0, 0.0203], rot=[1, 0, 0, 0]),    # type: ignore
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/blue_block.usd",
                 scale=(1.0, 1.0, 1.0),
@@ -121,7 +123,7 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         )
         self.scene.cube_2 = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Cube_2",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.55, 0.05, 0.0203], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.55, 0.05, 0.0203], rot=[1, 0, 0, 0]),  # type: ignore
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/red_block.usd",
                 scale=(1.0, 1.0, 1.0),
@@ -131,7 +133,7 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         )
         self.scene.cube_3 = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Cube_3",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.60, -0.1, 0.0203], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.60, -0.1, 0.0203], rot=[1, 0, 0, 0]),  # type: ignore
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/green_block.usd",
                 scale=(1.0, 1.0, 1.0),
@@ -144,31 +146,27 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         marker_cfg = FRAME_MARKER_CFG.copy()
         marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
         marker_cfg.prim_path = "/Visuals/FrameTransformer"
+        # Defines end-effector frame transformer
         self.scene.ee_frame = FrameTransformerCfg(
             prim_path="{ENV_REGEX_NS}/Robot/panda_link0",
-            debug_vis=False,
+            debug_vis=True,
             visualizer_cfg=marker_cfg,
             target_frames=[
                 FrameTransformerCfg.FrameCfg(
                     prim_path="{ENV_REGEX_NS}/Robot/panda_hand",
                     name="end_effector",
                     offset=OffsetCfg(
-                        pos=[0.0, 0.0, 0.1034],
+                        pos=[0.0, 0.0, 0.1034],  # type: ignore
                     ),
                 ),
                 FrameTransformerCfg.FrameCfg(
-                    prim_path="{ENV_REGEX_NS}/Robot/panda_rightfinger",
-                    name="tool_rightfinger",
+                    prim_path="{ENV_REGEX_NS}/Robot/panda_link0",
+                    name="base",
                     offset=OffsetCfg(
-                        pos=(0.0, 0.0, 0.046),
-                    ),
-                ),
-                FrameTransformerCfg.FrameCfg(
-                    prim_path="{ENV_REGEX_NS}/Robot/panda_leftfinger",
-                    name="tool_leftfinger",
-                    offset=OffsetCfg(
-                        pos=(0.0, 0.0, 0.046),
+                        pos=(0.0, 0.0, 0.0),  # type: ignore
                     ),
                 ),
             ],
         )
+
+        

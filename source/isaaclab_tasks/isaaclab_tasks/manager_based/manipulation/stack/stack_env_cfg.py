@@ -26,32 +26,32 @@ It includes the scene configuration, MDP settings, and event configurations."""
 
 
 ##
-# Scene definition
+# Scene definition -> defines the scene with a table, robot "Franka Emika", and objects
 ##
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
     """Configuration for the lift scene with a robot and a object.
     This is the abstract base implementation, the exact scene is defined in the derived classes
-    which need to set the target object, robot and end-effector frames
+    which need to set the target object, robot-configuration and end-effector frames
     """
 
-    # robots: will be populated by agent env cfg
-    robot: ArticulationCfg = MISSING
+    # robots: will be populated by the derived env cfg
+    robot: ArticulationCfg = MISSING # type: ignore
     # end-effector sensor: will be populated by agent env cfg
-    ee_frame: FrameTransformerCfg = MISSING
+    ee_frame: FrameTransformerCfg = MISSING # type: ignore
 
     # Table
     table = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Table",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
+        prim_path="{ENV_REGEX_NS}/Table", # Defines where the table is spawned in the USD stage
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]), # type: ignore
         spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"),
     )
 
     # plane
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0, 0, -1.05]),
-        spawn=GroundPlaneCfg(),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0, 0, -1.05]), # type: ignore
+        spawn=GroundPlaneCfg(), # type: ignore
     )
 
     # lights
@@ -69,10 +69,11 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     # will be set by agent env cfg
-    arm_action: mdp.JointPositionActionCfg = MISSING
-    gripper_action: mdp.BinaryJointPositionActionCfg = MISSING
+    arm_action: mdp.JointPositionActionCfg = MISSING # type: ignore
+    gripper_action: mdp.BinaryJointPositionActionCfg = MISSING # type: ignore
 
 
+# Define three observation groups: Policy, RGBCameraPolicy, and SubtaskCfg
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -107,8 +108,9 @@ class ObservationsCfg:
     class SubtaskCfg(ObsGroup):
         """Observations for subtask group."""
 
+        # cube_1: blue, cube_2: red, cube_3: green
         grasp_1 = ObsTerm(
-            func=mdp.object_grasped,
+            func=mdp.object_grasped, # Checks if cube_1 is grasped by the robot
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
                 "ee_frame_cfg": SceneEntityCfg("ee_frame"),
@@ -116,7 +118,7 @@ class ObservationsCfg:
             },
         )
         stack_1 = ObsTerm(
-            func=mdp.object_stacked,
+            func=mdp.object_stacked, # Checks if cube_2 is stacked on cube_1
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
                 "upper_object_cfg": SceneEntityCfg("cube_2"),
@@ -124,7 +126,7 @@ class ObservationsCfg:
             },
         )
         grasp_2 = ObsTerm(
-            func=mdp.object_grasped,
+            func=mdp.object_grasped, # Checks if cube_3 is grasped by the robot
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
                 "ee_frame_cfg": SceneEntityCfg("ee_frame"),
@@ -159,10 +161,10 @@ class TerminationsCfg:
     cube_3_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("cube_3")}
     )
-
+    # Success condition: all cubes stacked -> Very important for annotate_demos.py
     success = DoneTerm(func=mdp.cubes_stacked)
 
-
+# Define the main stacking environment configuration -> Inherits from ManagerBasedRLEnvCfg "Manager based workflow"
 @configclass
 class StackEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the stacking environment."""
@@ -175,12 +177,13 @@ class StackEnvCfg(ManagerBasedRLEnvCfg):
     # MDP settings
     terminations: TerminationsCfg = TerminationsCfg()
 
-    # Unused managers
+    # Unused managers -> These are not used in imitation learning pipelines
     commands = None
     rewards = None
     events = None
     curriculum = None
 
+    # Configuration for viewing and interacting with the environment through an XR device.
     xr: XrCfg = XrCfg(
         anchor_pos=(-0.1, -0.5, -1.05),
         anchor_rot=(0.866, 0, 0, -0.5),
