@@ -1,0 +1,113 @@
+{
+  "configurations": [
+    {
+      "name": "config_0_test",
+      "description": "Test configuration with three cubes",
+      "poses": [
+        {
+          "pos": [0.500, -0.200, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.600, 0.00, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.500, 0.200, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    },
+
+    {
+      "name": "config_1_vertical_line",
+      "description": "Cubes arranged in a vertical line",
+      "poses": [
+        {
+          "pos": [0.500, -0.200, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.500, 0.00, 0.0203], 
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.500, 0.200, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "config_2_horizontal_spread",
+      "description": "Cubes spread horizontally across the table",
+      "poses": [
+        {
+          "pos": [0.35, 0.0, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.50, 0.0, 0.0203], 
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.65, 0.0, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "config_3_triangle_formation",
+      "description": "Cubes arranged in a triangle pattern",
+      "poses": [
+        {
+          "pos": [0.50, -0.05, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.45, 0.10, 0.0203], 
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.55, 0.10, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "config_4_diagonal_line",
+      "description": "Cubes arranged diagonally",
+      "poses": [
+        {
+          "pos": [0.40, -0.05, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.50, 0.05, 0.0203], 
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.60, 0.15, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "config_6_wide_spread",
+      "description": "Cubes spread wide apart",
+      "poses": [
+        {
+          "pos": [0.35, -0.12, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.50, 0.0, 0.0203], 
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        },
+        {
+          "pos": [0.65, 0.12, 0.0203],
+          "quat": [0.0, 0.0, 0.0, 1.0]
+        }
+      ]
+    }
+  ]
+}

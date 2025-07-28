@@ -146,6 +146,7 @@ def main():
     # Disable all recorders and terminations
     env_cfg.recorders = {}
     env_cfg.terminations = {}
+    env_cfg.events = {}
 
     # create environment from loaded config
     env = gym.make(env_name, cfg=env_cfg).unwrapped

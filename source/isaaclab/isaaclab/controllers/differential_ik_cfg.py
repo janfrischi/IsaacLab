@@ -50,6 +50,18 @@ class DifferentialIKControllerCfg:
         - "lambda_val": Damping coefficient (default: 0.01).
     """
 
+    # NEW: Moving average filter parameters
+    use_moving_average_filter: bool = False
+    """Whether to apply moving average filtering to the target pose. Defaults to False."""
+
+    position_filter_factor: float = 0.1
+    """Filter factor for position smoothing (0.0 = no filtering, 1.0 = no history). 
+    Typical values: 0.05-0.2 for smooth control. Defaults to 0.1."""
+
+    orientation_filter_factor: float = 0.1
+    """Filter factor for orientation smoothing using SLERP (0.0 = no filtering, 1.0 = no history).
+    Typical values: 0.05-0.2 for smooth control. Defaults to 0.1."""
+
     def __post_init__(self):
         # check valid input
         if self.command_type not in ["position", "pose"]:
@@ -68,3 +80,10 @@ class DifferentialIKControllerCfg:
         if self.ik_params is not None:
             ik_params.update(self.ik_params)
         self.ik_params = ik_params
+
+        # Validate filter parameters
+        if self.use_moving_average_filter:
+            if not (0.0 <= self.position_filter_factor <= 1.0):
+                raise ValueError(f"position_filter_factor must be in [0, 1], got {self.position_filter_factor}")
+            if not (0.0 <= self.orientation_filter_factor <= 1.0):
+                raise ValueError(f"orientation_filter_factor must be in [0, 1], got {self.orientation_filter_factor}")

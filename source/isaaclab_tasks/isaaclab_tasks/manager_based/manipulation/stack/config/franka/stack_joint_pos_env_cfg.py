@@ -22,7 +22,6 @@ from isaaclab_tasks.manager_based.manipulation.stack.stack_env_cfg import StackE
 # Pre-defined configs
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
-from isaaclab_assets.robots.franka import FRANKA_PANDA_CFG  # isort: skip
 # Import the real robot configuration
 from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG
 
@@ -33,6 +32,7 @@ from isaaclab_assets.robots.franka import FRANKA_PANDA_REAL_ROBOT_CFG
 class EventCfg:
     """Configuration for events."""
 
+    # Standard reset events
     init_franka_arm_pose = EventTerm(
         func=franka_stack_events.set_default_joint_pose,
         mode="reset",
@@ -51,14 +51,11 @@ class EventCfg:
         },
     )
 
-    # Randomize cubes for data generation
     randomize_cube_positions = EventTerm(
         func=franka_stack_events.randomize_object_pose,
         mode="reset",
         params={
-            # "pose_range": {"x": (0.4, 0.6), "y": (-0.10, 0.10), "z": (0.0203, 0.0203), "yaw": (-1.0, 1, 0)},
-            # We had to change yaw to 3.1415 to match the convention of the recording!
-            "pose_range": {"x": (0.4, 0.6), "y": (-0.3, 0.3), "z": (0.0203, 0.0203), "yaw": (3.1415, 3.1415, 0)},
+            "pose_range": {"x": (0.3, 0.6), "y": (-0.3, 0.3), "z": (0.0203, 0.0203), "yaw": (3.1415, 3.1415, 0)},
             "min_separation": 0.1,
             "asset_cfgs": [SceneEntityCfg("cube_1"), SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
@@ -71,8 +68,16 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        # Set events
+        # Set standard events
         self.events = EventCfg()
+        
+        # Add domain randomization events if enabled, enter if self.enable_domain_randomization is True
+        if self.enable_domain_randomization:
+            # Loop through every attribute (event) in the domain randomization config class
+            for attr_name in dir(self.domain_randomization):
+                if not attr_name.startswith('_') and hasattr(getattr(self.domain_randomization, attr_name), 'func'):
+                    # Add each domain randomization event to self.events -> This makes all domain randomization events available in the environment event system
+                    setattr(self.events, f"domain_rand_{attr_name}", getattr(self.domain_randomization, attr_name))
 
         # Fill in the missing components of the base config: Set real franka configuration as robot
         self.scene.robot = FRANKA_PANDA_REAL_ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -169,4 +174,3 @@ class FrankaCubeStackEnvCfg(StackEnvCfg):
             ],
         )
 
-        

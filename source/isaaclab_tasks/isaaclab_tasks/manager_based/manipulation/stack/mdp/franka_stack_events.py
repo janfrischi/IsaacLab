@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import math
+import numpy as np
 import random
 import torch
 from typing import TYPE_CHECKING
@@ -14,6 +15,7 @@ from typing import TYPE_CHECKING
 import isaaclab.utils.math as math_utils
 from isaaclab.assets import Articulation, AssetBase
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.envs import ManagerBasedRLEnv
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
@@ -184,3 +186,116 @@ def randomize_rigid_objects_in_focus(
             )
 
         env.rigid_objects_in_focus.append(selected_ids)
+
+"""Simulate communicationo delays and noise in control commands to mimic real-world robotics systems."""
+def randomize_control_latency(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    latency_steps_range: tuple[int, int] = (0, 3),  # 0-3 timesteps delay (0-150ms at 20Hz)
+):
+    """Simulate control latency by delaying action application."""
+    # Store this in environment to implement action buffering
+    if not hasattr(env, 'action_delay_buffer'):
+        env.action_delay_buffer = {}
+        env.action_delays = {}
+    
+    for env_id in env_ids:
+        # Sample random delay for this environment
+        delay = np.random.randint(latency_steps_range[0], latency_steps_range[1] + 1)
+        env.action_delays[env_id.item()] = delay
+        env.action_delay_buffer[env_id.item()] = []
+
+
+def randomize_control_noise(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    action_noise_std: float = 0.01,  # 1% action noise
+    velocity_noise_std: float = 0.005,  # Joint velocity noise
+):
+    """Add noise to control commands to simulate real actuator behavior."""
+    robot: Articulation = env.scene[asset_cfg.name]
+    
+    # Add noise to joint position targets
+    if hasattr(robot, '_joint_pos_target'):
+        noise = torch.randn_like(robot._joint_pos_target) * action_noise_std
+        robot._joint_pos_target += noise
+    
+    # Add velocity disturbances
+    vel_noise = torch.randn(len(env_ids), robot.num_joints, device=env.device) * velocity_noise_std
+    current_vel = robot.data.joint_vel[env_ids]
+    robot.set_joint_velocity_target(current_vel + vel_noise, env_ids=env_ids)
+
+def randomize_control_frequency(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    frequency_range: tuple[int, int] = (15, 25),  # 15-25 Hz variation around 20Hz
+):
+    """Simulate variable control frequencies due to computational load."""
+    # Store per-environment decimation factors
+    if not hasattr(env, 'variable_decimation'):
+        env.variable_decimation = {}
+    
+    for env_id in env_ids:
+        target_freq = np.random.randint(*frequency_range)
+        # Convert frequency to decimation (sim runs at 100Hz)
+        decimation = int(100 / target_freq)
+        env.variable_decimation[env_id.item()] = decimation
+
+
+def set_fixed_object_poses(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    asset_cfgs: list[SceneEntityCfg],
+    fixed_poses: list[dict],
+):
+    """Set fixed poses for objects.
+    
+    Args:
+        env: The environment.
+        env_ids: Environment IDs to reset.
+        asset_cfgs: List of asset configurations.
+        fixed_poses: List of pose dictionaries with keys 'pos' and 'quat' or 'euler'.
+                     Example: [{"pos": [0.4, 0.0, 0.02], "euler": [0, 0, 0]}, ...]
+    """
+    if env_ids is None:
+        return
+
+    # Set poses for each object
+    for i, asset_cfg in enumerate(asset_cfgs):
+        if i < len(fixed_poses):
+            asset = env.scene[asset_cfg.name]
+            pose_dict = fixed_poses[i]
+            
+            # Get position
+            pos = pose_dict.get("pos", [0.0, 0.0, 0.0])
+            
+            # Get orientation (prefer quaternion, fallback to euler)
+            if "quat" in pose_dict:
+                quat = pose_dict["quat"]
+                orientations = torch.tensor([quat], device=env.device)
+            elif "euler" in pose_dict:
+                euler = pose_dict["euler"]
+                orientations = math_utils.quat_from_euler_xyz(
+                    torch.tensor([euler[0]], device=env.device),
+                    torch.tensor([euler[1]], device=env.device), 
+                    torch.tensor([euler[2]], device=env.device)
+                )
+            else:
+                # Default to no rotation
+                orientations = torch.tensor([[1.0, 0.0, 0.0, 0.0]], device=env.device)
+            
+            # Apply to all specified environments
+            for env_id in env_ids:
+                positions = torch.tensor([pos], device=env.device) + env.scene.env_origins[env_id, 0:3]
+                asset.write_root_pose_to_sim(
+                    torch.cat([positions, orientations], dim=-1), 
+                    env_ids=torch.tensor([env_id], device=env.device)
+                )
+                asset.write_root_velocity_to_sim(
+                    torch.zeros(1, 6, device=env.device), 
+                    env_ids=torch.tensor([env_id], device=env.device)
+                )
+
+

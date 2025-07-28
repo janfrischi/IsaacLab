@@ -18,7 +18,8 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransf
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-
+from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab_tasks.manager_based.manipulation.stack.mdp import franka_stack_events
 from . import mdp
 
 """This file defines the foundational configuration for the stack environment.
@@ -42,15 +43,19 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     # Table
     table = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Table", # Defines where the table is spawned in the USD stage
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]), # type: ignore
-        spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"),
+        prim_path="{ENV_REGEX_NS}/Table",
+        # Add table offset in z direction to match the real robots configuration -> Offset coordinate frame by 0.011m
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0.011], rot=[0.707, 0, 0, 0.707]), # type: ignore
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd",
+            scale=(1, 1, 0.6762),  # (x_scale, y_scale, z_scale)
+        ),
     )
 
     # plane
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0, 0, -1.05]), # type: ignore
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0, 0, -0.68]), # type: ignore
         spawn=GroundPlaneCfg(), # type: ignore
     )
 
@@ -59,16 +64,16 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-
+    
 
 ##
-# MDP settings
+# MDP "Markov Decision Process" settings
 ##
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    # will be set by agent env cfg
+    # will be set by agent env cfg -> Set to Abs IK control for our stacking task
     arm_action: mdp.JointPositionActionCfg = MISSING # type: ignore
     gripper_action: mdp.BinaryJointPositionActionCfg = MISSING # type: ignore
 
@@ -76,22 +81,32 @@ class ActionsCfg:
 # Define three observation groups: Policy, RGBCameraPolicy, and SubtaskCfg
 @configclass
 class ObservationsCfg:
-    """Observation specifications for the MDP."""
+    """Observation specifications for the MDP - Contains three groups:
+    1. PolicyCfg: Observations for the policy group with state values.
+    2. RGBCameraPolicyCfg: Observations for the policy group with RGB images.
+    3. SubtaskCfg: Observations for the subtask group."""
 
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group with state values."""
 
+        # Implement observation noise -> Simulate state estimation errors
+        object = ObsTerm(func=mdp.object_obs_with_noise,
+                         params={"position_noise_std": 0.002, "orientation_noise_std": 0.002})
+        eef_pos = ObsTerm(func=mdp.ee_frame_pos_with_noise,
+                          params={"noise_std": 0.002})
+        eef_quat = ObsTerm(func=mdp.ee_frame_quat_with_noise,
+                           params={"noise_std": 0.002})
+        gripper_pos = ObsTerm(func=mdp.gripper_pos_with_noise,
+                            params={"noise_std": 0.001})
+
+        # Keep other observations as they are
         actions = ObsTerm(func=mdp.last_action)
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        object = ObsTerm(func=mdp.object_obs)
         cube_positions = ObsTerm(func=mdp.cube_positions_in_world_frame)
         cube_orientations = ObsTerm(func=mdp.cube_orientations_in_world_frame)
-        eef_pos = ObsTerm(func=mdp.ee_frame_pos)
-        eef_quat = ObsTerm(func=mdp.ee_frame_quat)
-        gripper_pos = ObsTerm(func=mdp.gripper_pos)
-
+    
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = False
@@ -138,15 +153,118 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = False
 
-    # observation groups
+    # Create observation groups "key value pairs"
     policy: PolicyCfg = PolicyCfg()
     rgb_camera: RGBCameraPolicyCfg = RGBCameraPolicyCfg()
     subtask_terms: SubtaskCfg = SubtaskCfg()
 
+# The domain randomization events are applied during environment resets
+@configclass 
+class DomainRandomizationCfg:
+    """Domain randomization settings for the stacking environment.
+    Defines what gets randomized during the environment reset."""
+
+    # Use IsaacLab's built-in actuator gains randomization
+    randomize_actuator_gains = EventTerm(
+        func=mdp.randomize_actuator_gains,  # Built-in function
+        mode="reset", # Trigger event on environment reset
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "stiffness_distribution_params": (0.3, 1.7),  # ±50% variation
+            "damping_distribution_params": (0.3, 1.7),  # ±50% variation
+            "operation": "scale",  # Scale the base values
+            "distribution": "uniform",
+        },
+    )
+
+    # Use IsaacLab's built-in mass randomization
+    randomize_robot_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,  # Built-in function
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "mass_distribution_params": (0.95, 1.05),  # ±5% mass variation
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    # Randomize cube masses using built-in function
+    randomize_cube_1_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_1"),
+            "mass_distribution_params": (0.8, 1.2),  # ±20% mass variation
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_cube_2_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_2"),
+            "mass_distribution_params": (0.8, 1.2),  # ±20% mass variation
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_cube_3_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_3"),
+            "mass_distribution_params": (0.8, 1.2),  # ±20% mass variation
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    # Randomize cube scales using built-in function
+    randomize_cube_1_scale = EventTerm(
+        func=mdp.randomize_rigid_body_scale,
+        mode="usd",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_1"),
+            "scale_range": (0.9, 1.1)  # ±10% scale variation
+        },
+    )
+
+    randomize_cube_2_scale = EventTerm(
+        func=mdp.randomize_rigid_body_scale,
+        mode="usd",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_2"),
+            "scale_range": (0.9, 1.1)  # ±10% scale variation
+        },
+    )
+
+    randomize_cube_3_scale = EventTerm(
+        func=mdp.randomize_rigid_body_scale,
+        mode="usd",
+        params={
+            "asset_cfg": SceneEntityCfg("cube_3"),
+            "scale_range": (0.9, 1.1)  # ±10% scale variation
+        },
+    )
+
+    # Randomize control latency using a custom function
+    randomize_control_latency = EventTerm(
+        func=franka_stack_events.randomize_control_latency,  # Custom function for control latency
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "latency_steps_range": (0, 3),  # 0-3 timesteps delay (0-150ms at 20Hz)
+        },
+    )
+
 
 @configclass
 class TerminationsCfg:
-    """Termination terms for the MDP."""
+    """Termination terms for the MDP, define when an episode ends."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
@@ -161,10 +279,10 @@ class TerminationsCfg:
     cube_3_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("cube_3")}
     )
-    # Success condition: all cubes stacked -> Very important for annotate_demos.py
+    # Success condition: all cubes stacked -> Crucial for annotating success in offline datasets
     success = DoneTerm(func=mdp.cubes_stacked)
 
-# Define the main stacking environment configuration -> Inherits from ManagerBasedRLEnvCfg "Manager based workflow"
+# Define the main stacking environment configuration -> Inherits from ManagerBasedRLEnvCfg "Manager base    d workflow"
 @configclass
 class StackEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the stacking environment."""
@@ -176,6 +294,8 @@ class StackEnvCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     # MDP settings
     terminations: TerminationsCfg = TerminationsCfg()
+    # Domain randomization settings
+    domain_randomization: DomainRandomizationCfg = DomainRandomizationCfg()
 
     # Unused managers -> These are not used in imitation learning pipelines
     commands = None
@@ -194,10 +314,13 @@ class StackEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         # Control frequency is 20Hz (50ms), decimation is 5, so simulation runs at 100Hz (10ms)
         self.decimation = 5
-        self.episode_length_s = 30.0
+        self.episode_length_s = 20.0
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.sim.render_interval = 2
+
+        # Enable domain randomization by default (can be disabled in child configs)
+        self.enable_domain_randomization = True
 
         self.sim.physx.bounce_threshold_velocity = 0.2
         self.sim.physx.bounce_threshold_velocity = 0.01

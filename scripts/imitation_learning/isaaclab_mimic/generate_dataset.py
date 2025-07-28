@@ -77,6 +77,7 @@ import isaaclab_tasks  # noqa: F401
 
 
 def main():
+    # Parse command line argument
     num_envs = args_cli.num_envs
 
     # Setup output paths and get env name
@@ -93,7 +94,7 @@ def main():
         generation_num_trials=args_cli.generation_num_trials,
     )
 
-    # create environment
+    # Create environment -> The environment uses your current domain randomization
     env = gym.make(env_name, cfg=env_cfg).unwrapped
 
     if not isinstance(env, ManagerBasedRLMimicEnv):
@@ -114,7 +115,7 @@ def main():
     # reset before starting
     env.reset()
 
-    # Setup and run async data generation
+    # Prepare asynchronous data generation using IsaacLab MIMIC framework
     async_components = setup_async_generation(
         env=env,
         num_envs=args_cli.num_envs,
@@ -122,7 +123,7 @@ def main():
         success_term=success_term,
         pause_subtask=args_cli.pause_subtask,
     )
-
+    # Start main data generation loop, which interacts with the env and the mimic data generation logic
     try:
         asyncio.ensure_future(asyncio.gather(*async_components["tasks"]))
         env_loop(

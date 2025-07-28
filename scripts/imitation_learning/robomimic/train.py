@@ -205,6 +205,7 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
 
     # setup for a new training run
     data_logger = DataLogger(log_dir, config=config, log_tb=config.experiment.logging.log_tb)
+    # Create the model using Robomimic's algorithm factory
     model = algo_factory(
         algo_name=config.algo_name,
         config=config,
@@ -266,6 +267,8 @@ def train(config: Config, device: str, log_dir: str, ckpt_dir: str, video_dir: s
     train_num_steps = config.experiment.epoch_every_n_steps
     valid_num_steps = config.experiment.validation_epoch_every_n_steps
 
+    # Detailed training (forward pass, loss computation, backpropagation, optimizer step) is done in TrainUtils.run_epoch
+    # model.train_on_batch is called within run_epoch, which handles the forward pass, loss computation, and optimizer step.
     for epoch in range(1, config.train.num_epochs + 1):  # epoch numbers start at 1
         step_log = TrainUtils.run_epoch(model=model, data_loader=train_loader, epoch=epoch, num_steps=train_num_steps)
         model.on_epoch_end(epoch)
@@ -427,7 +430,7 @@ if __name__ == "__main__":
     parser.add_argument("--algo", type=str, default=None, help="Name of the algorithm.")
     parser.add_argument("--log_dir", type=str, default="robomimic", help="Path to log directory")
     parser.add_argument("--normalize_training_actions", action="store_true", default=False, help="Normalize actions")
-    # Add this new argument
+
     parser.add_argument("--num_epochs", type=int, default=None, help="Number of training epochs")
 
     args = parser.parse_args()

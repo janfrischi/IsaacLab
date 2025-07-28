@@ -17,3 +17,17 @@ python /home/pdzuser/IsaacLab/scripts/tools/replay_demos.py --task Isaac-Stack-C
 
 5. Validate trained BC-Policy
 ./isaaclab.sh -p scripts/imitation_learning/robomimic/play.py --device cuda --task Isaac-Stack-Cube-Franka-IK-Abs-v0 --num_rollouts 100 --checkpoint /home/pdzuser/IsaacLab/logs/robomimic/Isaac-Stack-Cube-Franka-IK-Abs-v0/bc_rnn_low_dim_franka_stack/20250610170408/models/model_epoch_2000.pth
+
+
+
+
+./isaaclab.sh -p scripts/imitation_learning/robomimic/play_custom_cubes.py \
+    --device cuda \
+    --task Isaac-Stack-Cube-Franka-IK-Abs-v0 \
+    --checkpoint /home/pdzuser/IsaacLab/logs/robomimic/Isaac-Stack-Cube-Franka-IK-Abs-v0/bc_rnn_low_dim_franka_stack/20250610170408/models/model_epoch_2000.pth \
+    --custom_cube_poses scripts/imitation_learning/robomimic/data/cubes.json \
+    --num_rollouts 12 \
+    --horizon 800 \
+    --seed 101 \
+    --save_observations \
+    --obs_output_file results/custom_cube_observations.pkl \

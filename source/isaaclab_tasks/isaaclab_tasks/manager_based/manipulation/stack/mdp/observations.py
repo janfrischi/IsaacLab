@@ -324,3 +324,120 @@ def object_stacked(
     )
 
     return stacked
+
+# New: Add noise to the end effector position
+def ee_frame_pos_with_noise(
+    env: ManagerBasedRLEnv, 
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+    noise_std: float = 0.001  # 1mm standard deviation
+) -> torch.Tensor:
+    """End-effector position with realistic sensor noise."""
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    ee_frame_pos = ee_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+    
+    # Add Gaussian noise
+    noise = torch.randn_like(ee_frame_pos) * noise_std
+    return ee_frame_pos + noise
+
+# New: Add noise to the end effector quaternon
+def ee_frame_quat_with_noise(
+    env: ManagerBasedRLEnv, 
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+    noise_std: float = 0.01  # Small quaternion noise
+) -> torch.Tensor:
+    """End-effector quaternion with realistic sensor noise."""
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    ee_frame_quat = ee_frame.data.target_quat_w[:, 0, :]
+    
+    # Add noise and renormalize
+    noise = torch.randn_like(ee_frame_quat) * noise_std
+    noisy_quat = ee_frame_quat + noise
+    return noisy_quat / torch.norm(noisy_quat, dim=-1, keepdim=True)
+
+# New: Add noise to the gripper position
+def gripper_pos_with_noise(
+    env: ManagerBasedRLEnv, 
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    noise_std: float = 0.0005  # 0.5mm noise
+) -> torch.Tensor:
+    """Gripper position with realistic encoder noise."""
+    robot: Articulation = env.scene[robot_cfg.name]
+    finger_joint_1 = robot.data.joint_pos[:, -1].clone().unsqueeze(1)
+    finger_joint_2 = -1 * robot.data.joint_pos[:, -2].clone().unsqueeze(1)
+    
+    gripper_pos = torch.cat((finger_joint_1, finger_joint_2), dim=1)
+    
+    # Add encoder noise
+    noise = torch.randn_like(gripper_pos) * noise_std
+    return gripper_pos + noise
+
+# New: Add noise to object observations
+def object_obs_with_noise(
+    env: ManagerBasedRLEnv,
+    cube_1_cfg: SceneEntityCfg = SceneEntityCfg("cube_1"),
+    cube_2_cfg: SceneEntityCfg = SceneEntityCfg("cube_2"), 
+    cube_3_cfg: SceneEntityCfg = SceneEntityCfg("cube_3"),
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+    position_noise_std: float = 0.002,  # 2mm position noise
+    orientation_noise_std: float = 0.01  # Small orientation noise
+):
+    """Object observations with realistic vision system noise."""
+    cube_1: RigidObject = env.scene[cube_1_cfg.name]
+    cube_2: RigidObject = env.scene[cube_2_cfg.name]
+    cube_3: RigidObject = env.scene[cube_3_cfg.name]
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+
+    # Get base observations
+    cube_1_pos_w = cube_1.data.root_pos_w
+    cube_1_quat_w = cube_1.data.root_quat_w
+    cube_2_pos_w = cube_2.data.root_pos_w  
+    cube_2_quat_w = cube_2.data.root_quat_w
+    cube_3_pos_w = cube_3.data.root_pos_w
+    cube_3_quat_w = cube_3.data.root_quat_w
+    ee_pos_w = ee_frame.data.target_pos_w[:, 0, :]
+
+    # Add noise to positions
+    pos_noise = torch.randn_like(cube_1_pos_w) * position_noise_std
+    cube_1_pos_w_noisy = cube_1_pos_w + pos_noise
+    cube_2_pos_w_noisy = cube_2_pos_w + torch.randn_like(cube_2_pos_w) * position_noise_std
+    cube_3_pos_w_noisy = cube_3_pos_w + torch.randn_like(cube_3_pos_w) * position_noise_std
+    
+    # Add noise to orientations and renormalize
+    quat_noise = torch.randn_like(cube_1_quat_w) * orientation_noise_std
+    cube_1_quat_w_noisy = cube_1_quat_w + quat_noise
+    cube_1_quat_w_noisy = cube_1_quat_w_noisy / torch.norm(cube_1_quat_w_noisy, dim=-1, keepdim=True)
+    
+    cube_2_quat_w_noisy = cube_2_quat_w + torch.randn_like(cube_2_quat_w) * orientation_noise_std
+    cube_2_quat_w_noisy = cube_2_quat_w_noisy / torch.norm(cube_2_quat_w_noisy, dim=-1, keepdim=True)
+    
+    cube_3_quat_w_noisy = cube_3_quat_w + torch.randn_like(cube_3_quat_w) * orientation_noise_std
+    cube_3_quat_w_noisy = cube_3_quat_w_noisy / torch.norm(cube_3_quat_w_noisy, dim=-1, keepdim=True)
+
+    # Compute relative positions with noisy data
+    gripper_to_cube_1 = cube_1_pos_w_noisy - ee_pos_w
+    gripper_to_cube_2 = cube_2_pos_w_noisy - ee_pos_w
+    gripper_to_cube_3 = cube_3_pos_w_noisy - ee_pos_w
+    cube_1_to_2 = cube_1_pos_w_noisy - cube_2_pos_w_noisy
+    cube_2_to_3 = cube_2_pos_w_noisy - cube_3_pos_w_noisy
+    cube_1_to_3 = cube_1_pos_w_noisy - cube_3_pos_w_noisy
+
+    return torch.cat(
+        (
+            cube_1_pos_w_noisy - env.scene.env_origins,
+            cube_1_quat_w_noisy,
+            cube_2_pos_w_noisy - env.scene.env_origins,
+            cube_2_quat_w_noisy,
+            cube_3_pos_w_noisy - env.scene.env_origins,
+            cube_3_quat_w_noisy,
+            gripper_to_cube_1,
+            gripper_to_cube_2,
+            gripper_to_cube_3,
+            cube_1_to_2,
+            cube_2_to_3,
+            cube_1_to_3,
+        ),
+        dim=1,
+    )
+
+
+
