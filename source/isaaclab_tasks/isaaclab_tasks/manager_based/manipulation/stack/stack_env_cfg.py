@@ -67,7 +67,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     
 
 ##
-# MDP "Markov Decision Process" settings
+# MDP settings
 ##
 @configclass
 class ActionsCfg:
@@ -81,10 +81,7 @@ class ActionsCfg:
 # Define three observation groups: Policy, RGBCameraPolicy, and SubtaskCfg
 @configclass
 class ObservationsCfg:
-    """Observation specifications for the MDP - Contains three groups:
-    1. PolicyCfg: Observations for the policy group with state values.
-    2. RGBCameraPolicyCfg: Observations for the policy group with RGB images.
-    3. SubtaskCfg: Observations for the subtask group."""
+    """Observation specifications for the MDP."""
 
     @configclass
     class PolicyCfg(ObsGroup):
@@ -92,13 +89,13 @@ class ObservationsCfg:
 
         # Implement observation noise -> Simulate state estimation errors
         object = ObsTerm(func=mdp.object_obs_with_noise,
-                         params={"position_noise_std": 0.002, "orientation_noise_std": 0.002})
+                        params={"position_noise_std": 0.01, "orientation_noise_std": 0.01})
         eef_pos = ObsTerm(func=mdp.ee_frame_pos_with_noise,
-                          params={"noise_std": 0.002})
+                        params={"noise_std": 0.01})
         eef_quat = ObsTerm(func=mdp.ee_frame_quat_with_noise,
-                           params={"noise_std": 0.002})
+                        params={"noise_std": 0.01})
         gripper_pos = ObsTerm(func=mdp.gripper_pos_with_noise,
-                            params={"noise_std": 0.001})
+                        params={"noise_std": 0.0005})
 
         # Keep other observations as they are
         actions = ObsTerm(func=mdp.last_action)
@@ -161,17 +158,16 @@ class ObservationsCfg:
 # The domain randomization events are applied during environment resets
 @configclass 
 class DomainRandomizationCfg:
-    """Domain randomization settings for the stacking environment.
-    Defines what gets randomized during the environment reset."""
+    """Domain randomization settings for the stacking environment."""
 
     # Use IsaacLab's built-in actuator gains randomization
     randomize_actuator_gains = EventTerm(
         func=mdp.randomize_actuator_gains,  # Built-in function
-        mode="reset", # Trigger event on environment reset
+        mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "stiffness_distribution_params": (0.3, 1.7),  # ±50% variation
-            "damping_distribution_params": (0.3, 1.7),  # ±50% variation
+            "stiffness_distribution_params": (0.3, 1.7),  # ±30% variation
+            "damping_distribution_params": None,  # ±50% variation
             "operation": "scale",  # Scale the base values
             "distribution": "uniform",
         },
@@ -223,34 +219,6 @@ class DomainRandomizationCfg:
         },
     )
 
-    # Randomize cube scales using built-in function
-    randomize_cube_1_scale = EventTerm(
-        func=mdp.randomize_rigid_body_scale,
-        mode="usd",
-        params={
-            "asset_cfg": SceneEntityCfg("cube_1"),
-            "scale_range": (0.9, 1.1)  # ±10% scale variation
-        },
-    )
-
-    randomize_cube_2_scale = EventTerm(
-        func=mdp.randomize_rigid_body_scale,
-        mode="usd",
-        params={
-            "asset_cfg": SceneEntityCfg("cube_2"),
-            "scale_range": (0.9, 1.1)  # ±10% scale variation
-        },
-    )
-
-    randomize_cube_3_scale = EventTerm(
-        func=mdp.randomize_rigid_body_scale,
-        mode="usd",
-        params={
-            "asset_cfg": SceneEntityCfg("cube_3"),
-            "scale_range": (0.9, 1.1)  # ±10% scale variation
-        },
-    )
-
     # Randomize control latency using a custom function
     randomize_control_latency = EventTerm(
         func=franka_stack_events.randomize_control_latency,  # Custom function for control latency
@@ -264,7 +232,7 @@ class DomainRandomizationCfg:
 
 @configclass
 class TerminationsCfg:
-    """Termination terms for the MDP, define when an episode ends."""
+    """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
@@ -279,10 +247,10 @@ class TerminationsCfg:
     cube_3_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("cube_3")}
     )
-    # Success condition: all cubes stacked -> Crucial for annotating success in offline datasets
+    # Success condition: all cubes stacked -> Very important for annotate_demos.py
     success = DoneTerm(func=mdp.cubes_stacked)
 
-# Define the main stacking environment configuration -> Inherits from ManagerBasedRLEnvCfg "Manager base    d workflow"
+# Define the main stacking environment configuration -> Inherits from ManagerBasedRLEnvCfg "Manager based workflow"
 @configclass
 class StackEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the stacking environment."""

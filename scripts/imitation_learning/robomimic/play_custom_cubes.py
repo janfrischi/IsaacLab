@@ -236,11 +236,6 @@ def rollout(policy, env, success_term, horizon, device, save_observations=False,
     observation_log = [] if save_observations else None
     csv_data = [] if save_observations else None
 
-    prev_gripper_action = None
-    gripper_smoothing_alpha = 0.3  # 0.0 = no smoothing, 1.0 = max smoothing
-    gripper_lockout_counter = 0
-    gripper_lockout_steps = 5  # Number of steps to lock the gripper closed
-
     for i in range(horizon):
         # 1. Observation Preprocessing
         obs = copy.deepcopy(obs_dict["policy"])
@@ -336,32 +331,13 @@ def rollout(policy, env, success_term, horizon, device, save_observations=False,
         # 3. Neural Network Inference
         actions = policy(filtered_obs)
 
-        # 4. Action Post-Processing
+        # 4. Action Post-Processing (only if normalization was used)
         if args_cli.norm_factor_min is not None and args_cli.norm_factor_max is not None:
             actions = (
                 (actions + 1) * (args_cli.norm_factor_max - args_cli.norm_factor_min)
             ) / 2 + args_cli.norm_factor_min
 
         actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
-
-        # --- Gripper lockout logic ---
-        gripper_action = actions[0, -1].item()
-        if gripper_lockout_counter > 0:
-            actions[0, -1] = -1.0  # Force closed
-            gripper_lockout_counter -= 1
-        elif gripper_action < 0:  # Policy requests close
-            actions[0, -1] = -1.0
-            gripper_lockout_counter = gripper_lockout_steps - 1  # Start lockout
-
-        print(f"Gripper action: {actions[0, -1].item()} (lockout: {gripper_lockout_counter})")
-
-        # --- Gripper action smoothing ---
-        if prev_gripper_action is not None:
-            actions[0, -1] = (
-                gripper_smoothing_alpha * prev_gripper_action +
-                (1 - gripper_smoothing_alpha) * actions[0, -1]
-            )
-        prev_gripper_action = actions[0, -1].clone()
 
         # Log actions
         if save_observations:

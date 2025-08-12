@@ -66,6 +66,7 @@ import omni
 
 from isaaclab.envs import ManagerBasedRLMimicEnv
 
+
 import isaaclab_mimic.envs  # noqa: F401
 
 if args_cli.enable_pinocchio:
