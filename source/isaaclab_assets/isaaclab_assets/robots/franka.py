@@ -38,15 +38,16 @@ FRANKA_PANDA_CFG = ArticulationCfg(
         ),
         
     ),
+    # As defined in the stack_joint_pos_env_cfg.py
     init_state=ArticulationCfg.InitialStateCfg(
         joint_pos={
-            "panda_joint1": 0.0,
-            "panda_joint2": -0.569,
-            "panda_joint3": 0.0,
-            "panda_joint4": -2.810,
-            "panda_joint5": 0.0,
-            "panda_joint6": 3.037,
-            "panda_joint7": 0.741,
+            "panda_joint1": 0.0444,
+            "panda_joint2": -0.1894,
+            "panda_joint3": -0.1107,
+            "panda_joint4": -2.5148,
+            "panda_joint5": 0.044,
+            "panda_joint6": 3.3775,
+            "panda_joint7": 0.6952,
             "panda_finger_joint.*": 0.04,
         },
     ),
@@ -148,11 +149,19 @@ FRANKA_PANDA_REAL_ROBOT_CFG.actuators = {
     ),
     # Gripper
     "panda_hand": ImplicitActuatorCfg(
-            joint_names_expr=["panda_finger_joint.*"],
-            effort_limit=200.0,
-            velocity_limit=0.2,
-            stiffness=2e3,
-            damping=1e2,
+        joint_names_expr=["panda_finger_joint.*"],
+        effort_limit=100.0,
+        velocity_limit=0.1, #adjusted from 0.2
+        stiffness=1200,
+        damping=70,
     ),
+    # Gripper
+    # "panda_hand": ImplicitActuatorCfg(
+    #         joint_names_expr=["panda_finger_joint.*"],
+    #         effort_limit=200.0,
+    #         velocity_limit=0.5,
+    #         stiffness=2e3,
+    #         damping=1e2,
+    # ),
 }
 

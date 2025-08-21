@@ -288,7 +288,7 @@ class StackEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = 2
 
         # Enable domain randomization by default (can be disabled in child configs)
-        self.enable_domain_randomization = True
+        self.enable_domain_randomization = False
 
         self.sim.physx.bounce_threshold_velocity = 0.2
         self.sim.physx.bounce_threshold_velocity = 0.01
