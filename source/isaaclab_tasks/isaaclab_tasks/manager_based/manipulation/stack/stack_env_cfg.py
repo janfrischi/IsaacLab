@@ -166,8 +166,8 @@ class DomainRandomizationCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "stiffness_distribution_params": (0.3, 1.7),  # ±30% variation
-            "damping_distribution_params": None,  # ±50% variation
+            "stiffness_distribution_params": (0.3, 1.7),  # ±70% variation
+            "damping_distribution_params": None,
             "operation": "scale",  # Scale the base values
             "distribution": "uniform",
         },
